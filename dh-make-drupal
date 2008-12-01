@@ -1,0 +1,124 @@
+#!/usr/bin/ruby
+require 'yaml'
+require 'commandline'
+
+class App < CommandLine::Application
+  def initialize
+    version '0.01'
+    author 'Gunnar Wolf'
+    copyright 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2008'
+    short_description 'Builds a Debian package for the requested Drupal project'
+    long_description '(...)'
+
+    option :version, :names => %w(--version -v)
+#    option(:dver, :names => %w(--drupal-version --d_ver -d), :arity => [1,1],
+#           :opt_description => 'Drupal version')
+    option :help
+
+    expected_args :project
+
+    puts #{opt :project}
+
+    @d_ver = 5 ### De-hardwire Drupal version
+  end
+
+  def main
+    puts DrupalProjectList.for(@project).choose(5, :recommended).to_yaml
+  end
+end
+
+class DrupalProjectList < Array
+  require 'hpricot'
+  require 'open-uri'
+
+  def self.for(drup_mod)
+    list = DrupalProjectList.new
+    url = "http://drupal.org/project/#{drup_mod}"
+    doc = Hpricot(open(url)) or 
+      raise IOError, "Could not open #{drup_mod} project website at #{url}"
+
+    # In the Drupal pages, releases are listed inside <table
+    # class="releases">.
+    #
+    # We will often get more than one element in releases - "official
+    # releases" and "development snapshots" are given as two
+    # tables. We should look for the highest (i.e. stablest) release
+    # we can get.
+    doc.search('table[@class="releases"]').each do |table|
+      (table/'tr').each do |tr|
+        rel = DrupalProjectRelease.from_tr(tr) or next
+        list << rel
+      end
+    end
+    list
+  end
+
+  # Returns all the versions available for the given Drupal version
+  # for the specified project. The version should be the standard
+  # family nomenclature used in Drupal (i.e. '4.7', '5', '6'). The
+  # versions are converted to strings for comparison.
+  def for_drupal_version(ver)
+    self.clone.delete_if {|item| item.drupal_version != ver.to_s}
+  end
+
+  def choose(drupal_ver, min_status)
+    self.for_drupal_version(drupal_ver).with_min_status(min_status).
+      sort_by {|item| item.version}[-1]
+  end
+
+  # Returns all the versions available for the given project which have
+  # a stability status at least equal the specified status. The status
+  # can be :developer (lowest), :supported or :recommended (highest).
+  def with_min_status(min_status)
+    statuses = DrupalProjectRelease::Statuses
+    unless min = statuses[min_status]
+      warn "Unknown status specified. Valid statuses: " +
+        statuses.keys.join(', ')
+      return nil
+    end
+
+    self.clone.delete_if {|item| item.status < min}
+  end
+end
+
+class DrupalProjectRelease
+  Statuses = {:developer => 0, :supported => 1, :recommended => 2}
+  attr_accessor :drupal_version, :version, :status, :url
+
+  # Creates a DrupalProjectRelease from a drupal.org table row (yes,
+  # heavily dependent on their Web layout)
+  def self.from_tr(tr)
+    rel = self.new
+
+    # We might receive non-interesting (i.e. empty or header)
+    # rows. Check first of all if we have a version string, and
+    # chicken out otherwise.
+    columns = tr/'td'
+    return nil unless columns[0]
+
+    # We get the status from the tr's class - Not very clean IMHO,
+    # as it is more visual-related, but we do have the necessary
+    # data: It can contain 'ok' (recommended), 'warning' (supported)
+    # or 'error' (developer)
+    rowclass = tr.attributes['class'].split(/\s+/)
+    rel.status = Statuses[:recommended] if rowclass.include? 'ok'
+    rel.status = Statuses[:supported] if rowclass.include? 'warning'
+    rel.status = Statuses[:developer] if rowclass.include? 'error'
+
+    # We split the full version (first column) into Drupal and
+    # project versions
+    full_ver = (columns[0]/'a').text
+    unless full_ver =~ /^([\d\.]+).x-(.+)$/ 
+      warn "cannot parse version: #{full_ver}"
+      return nil
+    end
+    rel.drupal_version = $1
+    rel.version = $2
+
+    # Column 3 has two URLs - We care about the first one, which
+    # points to the file download
+    rel.url = (columns[3]/'a')[0].attributes['href']
+
+    rel
+  end
+end
