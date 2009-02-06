@@ -11,19 +11,25 @@ class App < CommandLine::Application
     long_description '(...)'
 
     option :version, :names => %w(--version -v)
-#    option(:dver, :names => %w(--drupal-version --d_ver -d), :arity => [1,1],
-#           :opt_description => 'Drupal version')
+    option(:names => %w(--drupal-version -d), 
+           :opt_found => get_args,
+           :opt_not_found => 6,
+           :opt_description => 'Drupal version',
+           :arg_description => 'version')
     option :help
 
     expected_args :project
-
-    puts #{opt :project}
-
-    @d_ver = 5 ### De-hardwire Drupal version
   end
 
   def main
-    puts DrupalProjectList.for(@project).choose(5, :recommended).to_yaml
+    @d_ver = opt['--drupal-version']
+    if release = DrupalProjectList.for(@project).choose(@d_ver, :recommended)
+      release.save_file
+      system "ls -hl #{release.dest_file}"
+    else
+      puts "No suitable version of #{@project} found for Drupal #{@d_ver}"
+      exit 1
+    end
   end
 end
 
@@ -46,7 +52,7 @@ class DrupalProjectList < Array
     # we can get.
     doc.search('table[@class="releases"]').each do |table|
       (table/'tr').each do |tr|
-        rel = DrupalProjectRelease.from_tr(tr) or next
+        rel = DrupalProjectRelease.from_tr(tr, drup_mod) or next
         list << rel
       end
     end
@@ -83,12 +89,13 @@ end
 
 class DrupalProjectRelease
   Statuses = {:developer => 0, :supported => 1, :recommended => 2}
-  attr_accessor :drupal_version, :version, :status, :url
+  attr_accessor :project, :drupal_version, :version, :status, :url
 
   # Creates a DrupalProjectRelease from a drupal.org table row (yes,
   # heavily dependent on their Web layout)
-  def self.from_tr(tr)
+  def self.from_tr(tr, project)
     rel = self.new
+    rel.project = project
 
     # We might receive non-interesting (i.e. empty or header)
     # rows. Check first of all if we have a version string, and
@@ -109,7 +116,7 @@ class DrupalProjectRelease
     # project versions
     full_ver = (columns[0]/'a').text
     unless full_ver =~ /^([\d\.]+).x-(.+)$/ 
-      warn "cannot parse version: #{full_ver}"
+      warn "cannot parse version #{full_ver} - Ignoring"
       return nil
     end
     rel.drupal_version = $1
@@ -120,5 +127,21 @@ class DrupalProjectRelease
     rel.url = (columns[3]/'a')[0].attributes['href']
 
     rel
+  end
+
+  def dest_file
+    "drupal%s-%s_%s.orig.tar.gz" % [drupal_version, project, version]
+  end
+
+  def save_file
+    begin
+      if File.exists?(dest_file)
+        raise Errno::EEXIST, "Destination filename for source tarball "+
+          "(#{dest_file}) already exists. Cannot continue."
+      end
+      File.open(dest_file, 'w') {|f| f.write open(url).read}
+    rescue OpenURI::HTTPError
+      puts "Requested URI #{url} could not be retreived"
+    end
   end
 end
