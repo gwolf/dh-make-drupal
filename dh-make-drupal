@@ -1,6 +1,7 @@
 #!/usr/bin/ruby
 require 'yaml'
 require 'commandline'
+require 'singleton'
 
 class App < CommandLine::Application
   def initialize
@@ -9,6 +10,8 @@ class App < CommandLine::Application
     copyright 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2008'
     short_description 'Builds a Debian package for the requested Drupal project'
     long_description '(...)'
+    synopsis 'project_name'
+    statuses = DrupalProject::Release::statuses
 
     option :version, :names => %w(--version -v)
     option(:names => %w(--drupal-version -d), 
@@ -16,132 +19,316 @@ class App < CommandLine::Application
            :opt_not_found => 6,
            :opt_description => 'Drupal version',
            :arg_description => 'version')
+    option(:flag, :names => %w(--report-only -r),
+           :opt_found => true, :opt_not_found => false,
+           :opt_description => "Check only for project availability, " +
+           "don't download or perform any other actions locally")
+    option(:names => %w(--min-status -s),
+           :opt_found => get_args,
+           :opt_not_found => statuses[0],
+           :opt_description => ('Minimum status to consider for packaging. ' +
+                                'Accepted values: %s. Defaults to %s.' %
+                                [ statuses.map {|s| "'#{s}'"}.join(', '),
+                                  statuses[0]]))
+    option(:names => %w(--debug),
+           :opt_found => get_args,
+           :opt_not_found => 1,
+           :opt_description => 'Debug level for generated messages ' +
+           '(0=highest, 5=lowest)',
+           :arg_description => 'level')
     option :help
 
     expected_args :project
   end
 
   def main
-    @d_ver = opt['--drupal-version']
-    if release = DrupalProjectList.for(@project).choose(@d_ver, :recommended)
-      release.save_file
-      system "ls -hl #{release.dest_file}"
-    else
-      puts "No suitable version of #{@project} found for Drupal #{@d_ver}"
-      exit 1
-    end
+    DrupalProject::Logger.instance.level = opt['--debug']
+
+    down = DrupalProject::Downloader.new(@project,
+                                         opt['--drupal-version'],
+                                         opt['--min-status'])
+    down.download unless opt['--report-only']
   end
 end
 
-class DrupalProjectList < Array
-  require 'hpricot'
-  require 'open-uri'
+module DrupalProject
+  # Finds the needed information for a given project's files
+  # (corresponding to the specified Drupal release and minimum
+  # stability level indicated), and allows for downloading it
+  class Downloader
+    attr_accessor :release, :project, :d_ver, :filename
+    # Fetches the needed information from the Drupal website. The
+    # project name is specified as the first parameter; the Drupal
+    # version to fetch the project for is specified as the second
+    # parameter (defaulting to 6); the third parameter is the minimum
+    # status (as reported by the author) to download - It can be (in
+    # decreasing order) :recommended, :supported or :developer,
+    # defaulting to :recommended.
+    def initialize(project, d_ver=6, status=:recommended)
+      Logger.instance.debug(("Preparing package for '%s' for Drupal %s, "+
+                             "status >= %s") % [project, d_ver, status])
+      @project = project
+      @d_ver = d_ver
+      begin
+        @release = DrupalProject::VersionsList.for(@project).
+          choose(d_ver, status)
+        Logger.instance.info "Found %s version %s (status: %s)" % 
+          [@release.project, @release.version, @release.sym_status]
+        Logger.instance.debug "Download URL: #{release.url}"
+      rescue EOFError => msg
+        Logger.instance.error msg
+      end
+    end
 
-  def self.for(drup_mod)
-    list = DrupalProjectList.new
-    url = "http://drupal.org/project/#{drup_mod}"
-    doc = Hpricot(open(url)) or 
-      raise IOError, "Could not open #{drup_mod} project website at #{url}"
+    # A #Downloader instantiation only gets the available
+    # information. To actually download the file, call #download. The
+    # file will be saved under the name specified by the #Release
+    # object. Note the filename will follow the regular Debian scheme
+    # (i.e. drupal6-og_1.1.orig.tar.gz), not the usual Drupal scheme
+    # (og-6.x-1.1.tar.gz).
+    def download
+      @release.save_file
+      @filename = release.dest_file
+    end
+  end
 
-    # In the Drupal pages, releases are listed inside <table
-    # class="releases">.
+  # Stores the basic settings on how to treat the different kind of
+  # projects available through the Drupal website.
+  #
+  # Currently we are only dealing with modules, themes and
+  # translations. The other available types (theme engines,
+  # installation profiles and drupal project) are outside our scope -
+  # although this could be trivially expanded.
+  class Type
+    Known = {'Modules' => {:human => 'Module', :name_part => 'mod'},
+      'Themes' => {:human => 'Theme', :name_part => 'thm'},
+      'Translations' => {:human => 'Translation', :name_part => 'trans'}
+    }
+
+    # Takes the type string (as reported by each project in the
+    # 'Breadcrumbs' of its project page). If the key is not defined,
+    # raises a NameError exception.
+    def initialize(key)
+      raise NameError, "Unknown project type #{key}" unless Known.has_key?(key)
+      @key = key
+    end
+
+    # Human-readable name
+    def human; Known[@key][:human];end
+
+    # The particle to add in the generated package name
+    def name_part; Known[@key][:name_part];end
+  end
+
+  # Fetches the list of available versions for a given project, and
+  # allows for filtering it to match the user's requested criteria
+  class VersionsList < Array
+    require 'hpricot'
+    require 'open-uri'
+
+    # Builds the list of available versions for the requested project
+    def self.for(project)
+      list = VersionsList.new
+      url = "http://drupal.org/project/#{project}"
+      Logger.instance.debug "Fetching information from #{url}"
+      doc = Hpricot(open(url)) or 
+        raise IOError, "Could not open #{project} project website at #{url}"
+
+      # Which kind of project is this? The best way to tell I can come
+      # up with is to get it from the last element in the
+      # 'breadcrumbs' div
+      type = Type.new( (doc.search('div[@class="breadcrumb"]')[0] / 'a')[-1].
+                       inner_text )
+      Logger.instance.debug 'Project type for %s: %s' % [project, type.human]
+
+      # In the Drupal pages, releases are listed inside <table
+      # class="releases">.
+      #
+      # We will often get more than one element in releases - "official
+      # releases" and "development snapshots" are given as two
+      # tables. We should look for the highest (i.e. stablest) release
+      # we can get.
+      doc.search('table[@class="releases"]').each do |table|
+        (table/'tr').each do |tr|
+          rel = Release.from_tr(tr) or next
+          rel.project = project
+          rel.type = type
+
+          list << rel
+        end
+      end
+
+      list
+    end
+
+    # Returns all the versions available for the given Drupal version
+    # for the specified project. The version should be the standard
+    # family nomenclature used in Drupal (i.e. '4.7', '5', '6'). The
+    # versions are converted to strings for comparison.
+    def for_drupal_version(ver)
+      self.clone.delete_if {|item| item.drupal_version != ver.to_s}
+    end
+
+    # Gives the highest available version for this project available
+    # for the specified (first parameter) Drupal version, with the
+    # minimum requested stability (second parameter).
     #
-    # We will often get more than one element in releases - "official
-    # releases" and "development snapshots" are given as two
-    # tables. We should look for the highest (i.e. stablest) release
-    # we can get.
-    doc.search('table[@class="releases"]').each do |table|
-      (table/'tr').each do |tr|
-        rel = DrupalProjectRelease.from_tr(tr, drup_mod) or next
-        list << rel
+    # If no matching versions are found, a EOFError exception will be
+    # raised.
+    def choose(drupal_ver, min_status)
+      Logger.instance.debug(("Going over %d available releases, " +
+                             "searching for compatibility with Drupal %s, " +
+                             "minimum development status %s (%d)") % 
+                            [ self.size, drupal_ver, min_status, 
+                              Release::Statuses[min_status] ])
+
+      return self.for_drupal_version(drupal_ver).with_min_status(min_status).
+        sort_by {|item| item.version}[-1]
+      raise EOFError, "No suitable version found for Drupal %s, %s level" %
+        [drupal_ver, min_status]
+    end
+
+    # Returns all the versions available for the given project which have
+    # a stability status at least equal the specified status. The status
+    # can be :developer (lowest), :supported or :recommended (highest).
+    def with_min_status(min_status)
+      statuses = Release::Statuses
+      unless min = statuses[min_status.to_sym]
+        Logger.instance.error "Unknown status specified. Valid statuses: " +
+          statuses.keys.join(', ')
+        return nil
+      end
+
+      self.clone.delete_if {|item| item.status < min}
+    end
+
+    private
+    # This class should not be directly initialized from the outside -
+    # call VersionsList.for(project) instead
+    def initialize
+    end
+  end
+
+  # Represents the information for any given release of a Drupal project
+  class Release
+    Statuses = {:developer => 0, :supported => 1, :recommended => 2}
+    attr_accessor :project, :type, :drupal_version, :version, :status, :url
+
+    # Returns the list of statuses, highest first
+    def self.statuses
+      Statuses.keys.sort_by {|k| 0 - Statuses[k]}
+    end
+
+    # Creates a DrupalProject::Release from a drupal.org table row
+    # (yes, heavily dependent on their Web layout). Note that you will
+    # still have to explicitly 'give' this Release its project and
+    # type once it is created.
+    def self.from_tr(tr)
+      rel = self.new
+
+      # We might receive non-interesting (i.e. empty or header)
+      # rows. Check first of all if we have a version string, and
+      # chicken out otherwise.
+      columns = tr/'td'
+      return nil unless columns[0]
+
+      # We get the status from the tr's class - Not very clean IMHO,
+      # as it is more visual-related, but we do have the necessary
+      # data: It can contain 'ok' (recommended), 'warning' (supported)
+      # or 'error' (developer)
+      rowclass = tr.attributes['class'].split(/\s+/)
+      rel.status = Statuses[:recommended] if rowclass.include? 'ok'
+      rel.status = Statuses[:supported] if rowclass.include? 'warning'
+      rel.status = Statuses[:developer] if rowclass.include? 'error'
+
+      # We split the full version (first column) into Drupal and
+      # project versions
+      full_ver = (columns[0]/'a').text
+      Logger.instance.debug "Found version %s (%s)" %
+        [full_ver, rel.sym_status]
+      unless full_ver =~ /^([\d\.]+).x-(.+)$/ 
+        Logger.instance.info "cannot parse version #{full_ver} - Ignoring"
+        return nil
+      end
+      rel.drupal_version = $1
+      rel.version = $2
+
+      # Column 3 has two URLs - We care about the first one, which
+      # points to the file download
+      rel.url = (columns[3]/'a')[0].attributes['href']
+
+      rel
+    end
+
+    # Returns the filename to which this release should be saved to
+    def dest_file
+      "drupal%s-%s-%s_%s.orig.tar.gz" % 
+        [drupal_version, type.name_part, project, version]
+    end
+
+    # Fetches the this project's released tar.gz, saves it with the
+    # filename specified by #dest_file
+    def save_file
+      Logger.instance.debug "Retreiving remote file #{@url}"
+      Logger.instance.debug "Attempting to save in #{dest_file}"
+      begin
+        if File.exists?(dest_file)
+          raise Errno::EEXIST, "Destination filename for source tarball "+
+            "(#{dest_file}) already exists. Cannot continue."
+        end
+        File.open(dest_file, 'w') {|f| f.write open(url).read}
+      rescue OpenURI::HTTPError
+        Logger.instance.error "Requested URI #{url} could not be retreived"
       end
     end
-    list
+
+    # Returns the symbolic status for this revision
+    def sym_status
+      Statuses.each {|k,v| return k if v == @status}
+      nil
+    end
   end
 
-  # Returns all the versions available for the given Drupal version
-  # for the specified project. The version should be the standard
-  # family nomenclature used in Drupal (i.e. '4.7', '5', '6'). The
-  # versions are converted to strings for comparison.
-  def for_drupal_version(ver)
-    self.clone.delete_if {|item| item.drupal_version != ver.to_s}
-  end
-
-  def choose(drupal_ver, min_status)
-    self.for_drupal_version(drupal_ver).with_min_status(min_status).
-      sort_by {|item| item.version}[-1]
-  end
-
-  # Returns all the versions available for the given project which have
-  # a stability status at least equal the specified status. The status
-  # can be :developer (lowest), :supported or :recommended (highest).
-  def with_min_status(min_status)
-    statuses = DrupalProjectRelease::Statuses
-    unless min = statuses[min_status]
-      warn "Unknown status specified. Valid statuses: " +
-        statuses.keys.join(', ')
-      return nil
+  # Reports the progress of the requested operations to the user,
+  # according to the minimum severity level specified. Handles four
+  # severity levels: Error, Warning, Info and Debug - Respectively, 0,
+  # 1, 2 and 3.
+  class Logger
+    include Singleton
+    Levels = %w(E W I D)
+    # Private method, not meant to be called directly (this is a
+    # singleton object)
+    def initialize(level=1)
+      @@level = level
     end
 
-    self.clone.delete_if {|item| item.status < min}
-  end
-end
-
-class DrupalProjectRelease
-  Statuses = {:developer => 0, :supported => 1, :recommended => 2}
-  attr_accessor :project, :drupal_version, :version, :status, :url
-
-  # Creates a DrupalProjectRelease from a drupal.org table row (yes,
-  # heavily dependent on their Web layout)
-  def self.from_tr(tr, project)
-    rel = self.new
-    rel.project = project
-
-    # We might receive non-interesting (i.e. empty or header)
-    # rows. Check first of all if we have a version string, and
-    # chicken out otherwise.
-    columns = tr/'td'
-    return nil unless columns[0]
-
-    # We get the status from the tr's class - Not very clean IMHO,
-    # as it is more visual-related, but we do have the necessary
-    # data: It can contain 'ok' (recommended), 'warning' (supported)
-    # or 'error' (developer)
-    rowclass = tr.attributes['class'].split(/\s+/)
-    rel.status = Statuses[:recommended] if rowclass.include? 'ok'
-    rel.status = Statuses[:supported] if rowclass.include? 'warning'
-    rel.status = Statuses[:developer] if rowclass.include? 'error'
-
-    # We split the full version (first column) into Drupal and
-    # project versions
-    full_ver = (columns[0]/'a').text
-    unless full_ver =~ /^([\d\.]+).x-(.+)$/ 
-      warn "cannot parse version #{full_ver} - Ignoring"
-      return nil
+    # Redefines the reporting level. If the specified level is below
+    # or above the meaningful levels, it will be adjusted to the
+    # (respectively) lowest or highest.
+    def level=(level)
+      l = level.to_i
+      l = 0 if l < 0
+      l = Levels.size if l > Levels.size
+      @@level = l
     end
-    rel.drupal_version = $1
-    rel.version = $2
 
-    # Column 3 has two URLs - We care about the first one, which
-    # points to the file download
-    rel.url = (columns[3]/'a')[0].attributes['href']
+    # Reports as a message as an error (priority 0). This will always
+    # be shown to the user.
+    def error(msg); say(0,msg);end
+    # Reports the message as a warning (priority 1)
+    def warn(msg);  say(1,msg);end
+    # Reports the message as informational (priority 2)
+    def info(msg);  say(2,msg);end
+    # Reports the message as debugging (priority 3)
+    def debug(msg); say(3,msg);end
 
-    rel
-  end
+    private
+    def say(level, msg)
+      warn '%s %s' % [prefix(level), msg] if @@level >= level
+    end
 
-  def dest_file
-    "drupal%s-%s_%s.orig.tar.gz" % [drupal_version, project, version]
-  end
-
-  def save_file
-    begin
-      if File.exists?(dest_file)
-        raise Errno::EEXIST, "Destination filename for source tarball "+
-          "(#{dest_file}) already exists. Cannot continue."
-      end
-      File.open(dest_file, 'w') {|f| f.write open(url).read}
-    rescue OpenURI::HTTPError
-      puts "Requested URI #{url} could not be retreived"
+    def prefix(level)
+      '%s:%s' % [Levels[level], ' '*level]
     end
   end
 end
