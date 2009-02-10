@@ -128,6 +128,7 @@ module DrupalProject
 
   class DebianPackager
     def initialize(down)
+      Logger.instance.debug 'Starting Debian package creation'
       @d_ver = down.d_ver
       @release = down.release
       @project = @release.project
@@ -141,6 +142,7 @@ module DrupalProject
       @instdir = '%s-%s' % [@pkgname, @release.version]
 
       ck_orig_tarball
+      Logger.instance.info 'Debian package name: %s' % @pkgname
     end
 
     def build_structure
@@ -168,13 +170,16 @@ module DrupalProject
       IO.popen('tar tzf %s' % @tarball).readlines.each do |file|
         if file.gsub!(/^#{@project.name}\//, '')
           entry = file.gsub(/\n$/, '')
-          @filelist << entry unless entry.empty?
+          next if entry.empty? or entry =~ /\/$/
+          @filelist << entry 
         else
           raise RuntimeError,('Downloaded file %s has an unexpected '+
                               'directory hierarchy (%s) - Aborting.') %
             [@tarball, file]
         end
       end
+      Logger.instance.debug('Original tarball verified - %s files included' %
+                            @filelist.size
     end
 
     # Sets up the directory for starting the Debian packaging
@@ -225,6 +230,9 @@ module DrupalProject
           '%s - %s' % [start_yr, release_yr]
         res << 'Copyright %s, %s (%s)' %
           [ years, @project.author.name, @project.author.info_url ] << ''
+        Logger.instance.debug 'Author copyright information found: ' + res
+      else
+        Logger.instance.debug 'Author copyright information not found'
       end
 
       # Canonically, Drupal modules include LICENSE.txt. Even more,
@@ -238,8 +246,11 @@ module DrupalProject
             'On Debian GNU/Linux systems, the complete text of the GNU ' <<
             'General Public License can be found in:' << '' <<
             '/usr/share/common-licenses/GPL-2'
+          Logger.instance.debug 'Upstream ships the canonical GPLv2'
         else
           res << data
+          Logger.instance.info('Cannot automatically determine the chosen ' +
+                               'license - Please check by hand')
         end
       else
         Logger.instance.warn('No license file found in distribution, cannot ' +
@@ -304,6 +315,7 @@ module DrupalProject
       targets.each {|t| res << RulesTarget.new(*t).to_s}
 
       put_in_file 'rules', res.join("\n")
+      File.chmod(0755, File.join(@instdir, 'debian', 'rules'))
     end
 
     def setup_dirs
