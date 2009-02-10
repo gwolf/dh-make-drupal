@@ -2,12 +2,15 @@
 require 'yaml'
 require 'commandline'
 require 'singleton'
+require 'etc'
+require 'ftools'
+require 'digest/md5'
 
 class App < CommandLine::Application
   def initialize
     version '0.01'
     author 'Gunnar Wolf'
-    copyright 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2008'
+    copyright 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009'
     short_description 'Builds a Debian package for the requested Drupal project'
     long_description '(...)'
     synopsis 'project_name'
@@ -20,9 +23,11 @@ class App < CommandLine::Application
            :opt_description => 'Drupal version',
            :arg_description => 'version')
     option(:flag, :names => %w(--report-only -r),
-           :opt_found => true, :opt_not_found => false,
            :opt_description => "Check only for project availability, " +
-           "don't download or perform any other actions locally")
+           "don't download or perform any other actions locally. Implies -D.")
+#    option(:flag, :names => %w(--force -f),
+#           :opt_description  => 'Proceed even if this will overwrite ' +
+#           'currently existing files')
     option(:names => %w(--min-status -s),
            :opt_found => get_args,
            :opt_not_found => statuses[0],
@@ -30,6 +35,9 @@ class App < CommandLine::Application
                                 'Accepted values: %s. Defaults to %s.' %
                                 [ statuses.map {|s| "'#{s}'"}.join(', '),
                                   statuses[0]]))
+    option(:flag, :names => %w(--download-only -D),
+           :opt_description => 'Do not attempt to debianize the project, ' +
+           'only download the tarball')
     option(:names => %w(--debug),
            :opt_found => get_args,
            :opt_not_found => 1,
@@ -47,7 +55,19 @@ class App < CommandLine::Application
     down = DrupalProject::Downloader.new(@project,
                                          opt['--drupal-version'],
                                          opt['--min-status'])
+
     down.download unless opt['--report-only']
+    down_only = opt['--download-only'] || opt['--report-only']
+    if down_only and !opt['--download-only']
+      DrupalProject::Logger.instance.info('--report-only implies ' +
+                                          '--download-only - Setting it as '+
+                                          'well.')
+    end
+
+    if ! down_only
+      deb = DrupalProject::DebianPackager.new(down) 
+      deb.build_structure
+    end
   end
 end
 
@@ -92,6 +112,164 @@ module DrupalProject
     end
   end
 
+  class DebianPackager
+    def initialize(down)
+      @d_ver = down.d_ver
+      @release = down.release
+      @project = @release.project
+      @version = @release.version
+      @author = @project.author
+      @maint_name = Etc::getpwuid.gecos.gsub /,+$/, ''
+      @maint_mail = ENV['EMAIL']
+      @pkgname = ('drupal%s-%s-%s' % [@d_ver, @project.p_type.name_part, 
+                                      @project.name]).gsub( /_/, '-')
+      @tarball = down.filename
+      @instdir = '%s-%s' % [@pkgname, @release.version]
+
+      ck_orig_tarball
+    end
+
+    def build_structure
+      setup_directory
+      setup_changelog
+      setup_compat
+      setup_control
+      setup_copyright
+      setup_dirs
+      setup_rules
+    end
+
+    private
+    # Checks if the original tarball looks like a sane Drupal project
+    # file, and populate @filelist with the relevant
+    # information. Raises a RuntimeError if it does not look right.
+    def ck_orig_tarball
+      @filelist = []
+      # We make a huge assumption here: That the downloaded tar.gz
+      # contains everyghing under a directory named just as the
+      # project. That seems to be the rule under the Drupal community,
+      # so... it stays until a better way is found :) Just check if
+      # the basic assumption holds before unpacking.
+      IO.popen('tar tzf %s' % @tarball).readlines.each do |file|
+        if file.gsub!(/^#{@project.name}\//, '')
+          @filelist << file
+        else
+          raise RuntimeError,('Downloaded file %s has an unexpected '+
+                              'directory hierarchy (%s) - Aborting.') %
+            [@tarball, file]
+        end
+      end
+    end
+
+    # Sets up the directory for starting the Debian packaging
+    def setup_directory
+      system("tar xzf #{@tarball}")
+      File.rename(@project.name, @instdir)
+      Dir.mkdir(File.join(@instdir, 'debian'))
+    end
+
+    def setup_changelog
+      timestamp = Time.now.strftime '%a, %d %b %Y %H:%M:%S %z'
+      deb_ver = '%s-1' % @release.version
+      distr = 'unstable'
+      
+      entry = ("%s (%s) %s; urgency=low\n\n" % [@pkgname, deb_ver, distr]) +
+        "  * Initial release\n\n" +
+        (" -- %s <%s>  %s" % [@maint_name, @maint_mail, timestamp] )
+
+      put_in_file 'changelog', entry
+    end
+
+    def setup_compat
+      put_in_file 'compat', '5'
+    end
+
+    def setup_copyright
+      res = ['-=-=-=- WARNING -=-=-=-',
+             'This file has been autogenerated by dh-make-drupal.', 
+             '',
+             'While this program does its best to achieve proper results,',
+             'copyright information is a very sensible topic which REQUIRES',
+             'HUMAN VALIDATION. Please make sure that this information is',
+             'correct.',
+             '-=-=-=-=-=-=-=-=-=-=-=-'
+            ]
+
+      if @project.author
+        start_yr = @project.creation.year
+        release_yr = @release.date.year
+        years = (start_yr == release_yr) ? start_yr : 
+          '%s - %s' % [start_yr, release_yr]
+        res << 'Copyright %s, %s (%s)' %
+          [ years, @project.author.name, @project.author.info_url ] << ''
+      end
+
+      # Canonically, Drupal modules include LICENSE.txt. Even more,
+      # canonically it is the GPLv2 - For further joy, it's usually
+      # the exact same file! :-)
+      license = File.join(@instdir, 'LICENSE.txt')
+      if File.exists?(license)
+        data = File.read(license)
+        if Digest::MD5.hexdigest(data) == "998ed0c116c0cebfcd9b2107b0d82973"
+          res << 'This package is licensed under the GNU General Public ' <<
+            'License (GPL) version 2.' << '' <<
+            'On Debian GNU/Linux systems, the complete text of the GNU ' <<
+            'General Public License can be found in:' << '' <<
+            '/usr/share/common-licenses/GPL-2'
+        else
+          res << data
+        end
+      else
+        Logger.instance.warn('LICENSE.txt not found in distribution, cannot ' +
+                             'guess copyright information - Please check by ' +
+                             'hand.')
+        res << 'Copyright information could not be automatically ' +
+          'retreived'
+      end
+
+      put_in_file 'copyright', res.join("\n")
+    end
+
+    def setup_control
+      put_in_file 'control', ['Source: %s' % @pkgname,
+                              'Section: web',
+                              'Priority: extra',
+                              'Maintainer: %s <%s>' % [@maint_name, 
+                                                       @maint_mail],
+                              'Build-Depends: debhelper (>> 5.0.0)',
+                              'Standards-Version: 3.8.0',
+                              '',
+                              'Package: %s' % @pkgname,
+                              'Architecture: all',
+                              'Depends: drupal%s' % @d_ver,
+                              'Description: %s' % short_descr,
+                              long_descr].join("\n")
+    end
+
+    def setup_rules
+    end
+
+    def setup_dirs
+      destdir = '/usr/share/drupal%d/%s/%s' % [@d_ver, @project.p_type.dir,
+                                               @project.name]
+      put_in_file 'dirs', destdir
+    end
+
+    def short_descr
+      '%s %s for Drupal %s' % [@project.name, @project.p_type.human, @d_ver]
+    end
+
+    def long_descr
+      @project.descr.word_wrap.prefix
+    end
+
+    def put_in_file(filename, data)
+      File.open(File.join(@instdir, 'debian', filename), 'w') do |f|
+        f.puts data
+      end
+    end
+  end
+
   # Stores the basic settings on how to treat the different kind of
   # projects available through the Drupal website.
   #
@@ -99,10 +277,17 @@ module DrupalProject
   # translations. The other available types (theme engines,
   # installation profiles and drupal project) are outside our scope -
   # although this could be trivially expanded.
-  class Type
-    Known = {'Modules' => {:human => 'Module', :name_part => 'mod'},
-      'Themes' => {:human => 'Theme', :name_part => 'thm'},
-      'Translations' => {:human => 'Translation', :name_part => 'trans'}
+  class ProjType
+    Known = {'Modules' => {:human => 'Module', 
+        :name_part => 'mod',
+        :dir => 'modules'},
+      'Themes' => {:human => 'Theme', 
+        :name_part => 'thm',
+        :dir => 'themes'},
+      'Translations' => {:human => 'Translation', 
+        :name_part => 'trans',
+        :dir => 'translations' # B0RKEN!
+      }
     }
 
     # Takes the type string (as reported by each project in the
@@ -116,8 +301,62 @@ module DrupalProject
     # Human-readable name
     def human; Known[@key][:human];end
 
+    # Directory part to store projects in (inside the Drupal root)
+    def dir; Known[@key][:dir]; end
+
     # The particle to add in the generated package name
     def name_part; Known[@key][:name_part];end
+  end
+
+  class Author
+    attr_accessor :name, :user_id, :info_url
+    def self.fetch_from(url)
+      auth = self.new
+
+      doc = Hpricot(open(url)) or 
+        raise IOError, "Could not open author information site at #{url}"
+      auth.info_url = url
+      auth.name = doc.search('dd[@class="profile-full-name"]').inner_text
+      auth.user_id = doc.search('h1[@class="title withtabs"]').inner_text
+
+      auth
+    end
+  end
+
+  class Project
+    attr_accessor :name, :p_type, :descr, :author, :creation, :html
+    def initialize(pr_name)
+      @name = pr_name
+      url = "http://drupal.org/project/#{pr_name}"
+      Logger.instance.debug "Fetching project information from #{url}"
+
+      @html = Hpricot(open(url)) or 
+        raise IOError, "Could not open #{name} project website at #{url}"
+
+      # Get the project description. Fetch only the first paragraph -
+      # This is usually enough for the .deb, and it should be
+      # hand-tuned if needed.
+      @descr = (@html.search('div[@class="content"]')[0] / 'p')[0].inner_text
+
+      # When was the project created?
+      @creation = Time.parse(@html.search('div[@class="info-page"]').
+                             search(':last').inner_text.gsub(/^ - /, ''))
+      
+      # Project author: We can only get the "first" author (the one
+      # that uploaded the node to Drupal, AFAICT). Still, we do what
+      # we can.
+      relative_url = (@html.search('div[@class="info-page"]')[0] /
+                      'a')[0].get_attribute('href').gsub( /^\//, '')
+      @author = Author.fetch_from('http://drupal.org/%s' % relative_url)
+
+      # Which kind of project is this? The best way to tell I can come
+      # up with is to get it from the last element in the
+      # 'breadcrumbs' div
+      @p_type = ProjType.new( (@html.search('div[@class="breadcrumb"]')[0] /
+                               'a')[-1].inner_text )
+      Logger.instance.debug 'Project type for %s: %s' % [@name, 
+                                                         @p_type.human]
+    end
   end
 
   # Fetches the list of available versions for a given project, and
@@ -126,20 +365,11 @@ module DrupalProject
     require 'hpricot'
     require 'open-uri'
 
+    attr_accessor :project
     # Builds the list of available versions for the requested project
-    def self.for(project)
+    def self.for(proj_name)
       list = VersionsList.new
-      url = "http://drupal.org/project/#{project}"
-      Logger.instance.debug "Fetching information from #{url}"
-      doc = Hpricot(open(url)) or 
-        raise IOError, "Could not open #{project} project website at #{url}"
-
-      # Which kind of project is this? The best way to tell I can come
-      # up with is to get it from the last element in the
-      # 'breadcrumbs' div
-      type = Type.new( (doc.search('div[@class="breadcrumb"]')[0] / 'a')[-1].
-                       inner_text )
-      Logger.instance.debug 'Project type for %s: %s' % [project, type.human]
+      list.project = Project.new(proj_name)
 
       # In the Drupal pages, releases are listed inside <table
       # class="releases">.
@@ -148,12 +378,10 @@ module DrupalProject
       # releases" and "development snapshots" are given as two
       # tables. We should look for the highest (i.e. stablest) release
       # we can get.
-      doc.search('table[@class="releases"]').each do |table|
+      list.project.html.search('table[@class="releases"]').each do |table|
         (table/'tr').each do |tr|
           rel = Release.from_tr(tr) or next
-          rel.project = project
-          rel.type = type
-
+          rel.project = list.project
           list << rel
         end
       end
@@ -212,7 +440,7 @@ module DrupalProject
   # Represents the information for any given release of a Drupal project
   class Release
     Statuses = {:developer => 0, :supported => 1, :recommended => 2}
-    attr_accessor :project, :type, :drupal_version, :version, :status, :url
+    attr_accessor(:project, :drupal_version, :version, :status, :url, :date)
 
     # Returns the list of statuses, highest first
     def self.statuses
@@ -253,6 +481,10 @@ module DrupalProject
       rel.drupal_version = $1
       rel.version = $2
 
+      # Column 1 has the date this release was uploaded
+      rel.date = Time.parse(columns[1].inner_text)
+      Logger.instance.debug "This release was uploaded on #{rel.date.to_s}"
+
       # Column 3 has two URLs - We care about the first one, which
       # points to the file download
       rel.url = (columns[3]/'a')[0].attributes['href']
@@ -263,7 +495,7 @@ module DrupalProject
     # Returns the filename to which this release should be saved to
     def dest_file
       "drupal%s-%s-%s_%s.orig.tar.gz" % 
-        [drupal_version, type.name_part, project, version]
+        [drupal_version, project.p_type.name_part, project.name, version]
     end
 
     # Fetches the this project's released tar.gz, saves it with the
@@ -330,5 +562,17 @@ module DrupalProject
     def prefix(level)
       '%s:%s' % [Levels[level], ' '*level]
     end
+  end
+end
+
+class String
+  def word_wrap(maxlen=70)
+    self.gsub(/\t/,"     ").gsub(/.{1,#{maxlen}}(?:\s|\Z)/) do 
+      ($& + 5.chr).gsub(/\n\005/,"\n").gsub(/\005/,"\n")
+    end
+  end
+
+  def prefix(with=' ')
+    self.split(/\n/).map {|l| '%s%s' % [with, l.empty? ? '.' : l]}.join("\n")
   end
 end
