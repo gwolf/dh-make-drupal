@@ -14,7 +14,7 @@ class App < CommandLine::Application
     short_description 'Builds a Debian package for the requested Drupal project'
     long_description <<DESC
 The purpose of this program is to generate Debian packages for any Drupal
-projects (that is, modules, themes or translations). 
+projects (that is, modules or themes). 
 
 Given that Drupal developers publish their work through the main Drupal 
 site (http://drupal.org), this program fetches the information for the
@@ -375,20 +375,17 @@ module DrupalProject
   # Stores the basic settings on how to treat the different kind of
   # projects available through the Drupal website.
   #
-  # Currently we are only dealing with modules, themes and
-  # translations. The other available types (theme engines,
-  # installation profiles and drupal project) are outside our scope -
-  # although this could be trivially expanded.
+  # Currently we are only dealing with modules and themes. The other
+  # available types (translations, theme engines, installation
+  # profiles and drupal project) are outside our scope - although for
+  # some of them, this codecould be trivially expanded.
   class ProjType
     Known = {'Modules' => {:human => 'Module', 
         :name_part => 'mod',
         :dir => 'modules'},
       'Themes' => {:human => 'Theme', 
         :name_part => 'thm',
-        :dir => 'themes'},
-      'Translations' => {:human => 'Translation', 
-        :name_part => 'trans',
-        :dir => 'translations' # B0RKEN!
+        :dir => 'themes'}
       }
     }
 
