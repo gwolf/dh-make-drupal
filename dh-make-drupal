@@ -107,15 +107,11 @@ module DrupalProject
                              "status >= %s") % [project, d_ver, status])
       @project = project
       @d_ver = d_ver
-      begin
-        @release = DrupalProject::VersionsList.for(@project).
-          choose(d_ver, status)
-        Logger.instance.info "Found %s version %s (status: %s)" % 
-          [@release.project, @release.version, @release.sym_status]
-        Logger.instance.debug "Download URL: #{release.url}"
-      rescue EOFError => msg
-        Logger.instance.error msg
-      end
+      @release = DrupalProject::VersionsList.for(@project).
+        choose(d_ver, status)
+      Logger.instance.info "Found %s version %s (status: %s)" % 
+        [@release.project, @release.version, @release.sym_status]
+      Logger.instance.debug "Download URL: #{release.url}"
     end
 
     # A #Downloader instantiation only gets the available
@@ -386,7 +382,6 @@ module DrupalProject
       'Themes' => {:human => 'Theme', 
         :name_part => 'thm',
         :dir => 'themes'}
-      }
     }
 
     # Takes the type string (as reported by each project in the
@@ -509,10 +504,13 @@ module DrupalProject
                             [ self.size, drupal_ver, min_status, 
                               Release::Statuses[min_status] ])
 
-      return self.for_drupal_version(drupal_ver).with_min_status(min_status).
-        sort_by {|item| item.version}[-1]
-      raise EOFError, "No suitable version found for Drupal %s, %s level" %
-        [drupal_ver, min_status]
+      res = self.for_drupal_version(drupal_ver).with_min_status(min_status).
+        sort_by {|item| item.version}
+      if res.empty?
+        raise EOFError, "No suitable version found for Drupal %s (level>=%s)" %
+          [drupal_ver, min_status]
+      end
+      return res[-1] # Last element: Highest available suitable version
     end
 
     # Returns all the versions available for the given project which have
@@ -655,7 +653,7 @@ module DrupalProject
 
     private
     def say(level, msg)
-      warn '%s %s' % [prefix(level), msg] if @@level >= level
+      puts '%s %s' % [prefix(level), msg] if @@level >= level
     end
 
     def prefix(level)
