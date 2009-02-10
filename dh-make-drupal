@@ -154,6 +154,7 @@ module DrupalProject
       setup_control
       setup_copyright
       setup_dirs
+      setup_watch
       setup_rules
     end
 
@@ -200,6 +201,13 @@ module DrupalProject
 
     def setup_compat
       put_in_file 'compat', '5'
+    end
+
+    def setup_watch
+      res = ['version=3',
+             ( 'http://drupal.org/project/%s .*/%s-%s.x-(\d[\d_.]+)\.tar\.gz' %
+               [@project.name, @project.name, @d_ver] ) ].join("\n")
+      put_in_file 'watch', res
     end
 
     def setup_copyright
