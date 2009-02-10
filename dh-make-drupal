@@ -12,8 +12,26 @@ class App < CommandLine::Application
     author 'Gunnar Wolf'
     copyright 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009'
     short_description 'Builds a Debian package for the requested Drupal project'
-    long_description '(...)'
-    synopsis 'project_name'
+    long_description <<DESC
+The purpose of this program is to generate Debian packages for any Drupal
+projects (that is, modules, themes or translations). 
+
+Given that Drupal developers publish their work through the main Drupal 
+site (http://drupal.org), this program fetches the information for the
+latest available versions (for the right Drupal release, and with the 
+specified stability level), and prepares a Debian package from it.
+
+This Debian package can be locally installed using 'dpkg', or uploaded to your
+Apt repository.
+
+Keep in mind that this package only goes as far as it can, being an automated 
+tool. The generated packages will probably require verification/tweaking to
+be of production quality.
+
+This program has been inspired -and named in a similar fashion to- Debian's
+pkg-perl group's dh-make-perl.
+DESC
+    synopsis '[options] project_name'
     statuses = DrupalProject::Release::statuses
 
     option :version, :names => %w(--version -v)
