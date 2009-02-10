@@ -179,7 +179,7 @@ module DrupalProject
         end
       end
       Logger.instance.debug('Original tarball verified - %s files included' %
-                            @filelist.size
+                            @filelist.size)
     end
 
     # Sets up the directory for starting the Debian packaging
@@ -230,7 +230,7 @@ module DrupalProject
           '%s - %s' % [start_yr, release_yr]
         res << 'Copyright %s, %s (%s)' %
           [ years, @project.author.name, @project.author.info_url ] << ''
-        Logger.instance.debug 'Author copyright information found: ' + res
+        Logger.instance.debug 'Author copyright information found: ' + res.join("\n")
       else
         Logger.instance.debug 'Author copyright information not found'
       end
