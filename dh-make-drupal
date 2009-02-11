@@ -34,57 +34,67 @@ DESC
     synopsis '[options] project_name'
     statuses = DrupalProject::Release::statuses
 
-    option :version, :names => %w(--version -v)
-    option(:names => %w(--drupal-version -d), 
+    option(:names => %w(-d --drupal-version), 
            :opt_found => get_args,
            :opt_not_found => 6,
            :opt_description => 'Drupal version',
            :arg_description => 'version')
-    option(:flag, :names => %w(--report-only -r),
+    option(:flag, :names => %w(-r --report-only),
            :opt_description => "Check only for project availability, " +
            "don't download or perform any other actions locally. Implies -D.")
 #    option(:flag, :names => %w(--force -f),
 #           :opt_description  => 'Proceed even if this will overwrite ' +
 #           'currently existing files')
-    option(:names => %w(--min-status -s),
+    option(:names => %w(-s --min-status),
            :opt_found => get_args,
            :opt_not_found => statuses[0],
            :opt_description => ('Minimum status to consider for packaging. ' +
                                 'Accepted values: %s. Defaults to %s.' %
                                 [ statuses.map {|s| "'#{s}'"}.join(', '),
                                   statuses[0]]))
-    option(:flag, :names => %w(--download-only -D),
+    option(:flag, :names => %w(-D --dont-debianize),
            :opt_description => 'Do not attempt to debianize the project, ' +
            'only download the tarball')
+    option(:flag, :names => %w(-b --no-build),
+           :opt_description => 'Prepare the debianized directory, but omit ' +
+           'the actual package build process. This option is incompatible ' +
+           'with either -D and -r.')
     option(:names => %w(--debug),
            :opt_found => get_args,
            :opt_not_found => 1,
            :opt_description => 'Debug level for generated messages ' +
            '(0=highest, 5=lowest)',
            :arg_description => 'level')
-    option :help
+    option :version, :names => %w(-v --version)
+    option :help, :names => %w(-h --help)
 
     expected_args :project
   end
 
   def main
-    DrupalProject::Logger.instance.level = opt['--debug']
+    d_ver = opt['-d']
+    min_status = opt['-s']
+    debug = opt['--debug'] 
+    report_only = opt['-r']
+    debianize = ! opt['-D']
+    skip_build = opt['-b']
 
-    down = DrupalProject::Downloader.new(@project,
-                                         opt['--drupal-version'],
-                                         opt['--min-status'])
+    DrupalProject::Logger.instance.level = debug
 
-    down.download unless opt['--report-only']
-    down_only = opt['--download-only'] || opt['--report-only']
-    if down_only and !opt['--download-only']
-      DrupalProject::Logger.instance.info('--report-only implies ' +
-                                          '--download-only - Setting it as '+
-                                          'well.')
+    down = DrupalProject::Downloader.new(@project, d_ver, min_status)
+    down.download unless report_only
+
+    if report_only and debianize
+      DrupalProject::Logger.instance.info('--report-only (-r) implies ' +
+                                          '--dont-debianize (-D) - Skipping '+
+                                          'Debian package creation.')
+      debianize = false
     end
 
-    if ! down_only
+    if debianize
       deb = DrupalProject::DebianPackager.new(down) 
       deb.build_structure
+      deb.build_package unless skip_build
     end
   end
 end
@@ -156,6 +166,9 @@ module DrupalProject
       setup_rules
     end
 
+    def build_package
+    end
+
     private
     # Checks if the original tarball looks like a sane Drupal project
     # file, and populate @filelist with the relevant
@@ -167,17 +180,12 @@ module DrupalProject
       # project. That seems to be the rule under the Drupal community,
       # so... it stays until a better way is found :) Just check if
       # the basic assumption holds before unpacking.
-      IO.popen('tar tzf %s' % @tarball).readlines.each do |file|
-        if file.gsub!(/^#{@project.name}\//, '')
-          entry = file.gsub(/\n$/, '')
-          next if entry.empty? or entry =~ /\/$/
-          @filelist << entry 
-        else
-          raise RuntimeError,('Downloaded file %s has an unexpected '+
-                              'directory hierarchy (%s) - Aborting.') %
-            [@tarball, file]
-        end
-      end
+      @filelist = IO.popen('tar tzf %s' % @tarball).readlines.map do |file|
+        raise RuntimeError,('Downloaded file %s has an unexpected '+
+                            'directory hierarchy (%s) - Aborting.') %
+          [@tarball, file] unless file.gsub!(/^#{@project.name}\//, '')
+        file.gsub(/\n$/, '')
+      end.reject {|file| file.empty?}
       Logger.instance.debug('Original tarball verified - %s files included' %
                             @filelist.size)
     end
@@ -189,6 +197,7 @@ module DrupalProject
       Dir.mkdir(File.join(@instdir, 'debian'))
     end
 
+    # Creates the debian/changelog file
     def setup_changelog
       timestamp = Time.now.strftime '%a, %d %b %Y %H:%M:%S %z'
       deb_ver = '%s-1' % @release.version
@@ -201,10 +210,12 @@ module DrupalProject
       put_in_file 'changelog', entry
     end
 
+    # Creates the debian/compat file
     def setup_compat
       put_in_file 'compat', '5'
     end
 
+    # Creates the debian/watch file
     def setup_watch
       res = ['version=3',
              ( 'http://drupal.org/project/%s .*/%s-%s.x-(\d[\d_.]+)\.tar\.gz' %
@@ -212,6 +223,7 @@ module DrupalProject
       put_in_file 'watch', res
     end
 
+    # Creates the debian/copyright file
     def setup_copyright
       res = ['-=-=-=- WARNING -=-=-=-',
              'This file has been autogenerated by dh-make-drupal.', 
@@ -230,7 +242,8 @@ module DrupalProject
           '%s - %s' % [start_yr, release_yr]
         res << 'Copyright %s, %s (%s)' %
           [ years, @project.author.name, @project.author.info_url ] << ''
-        Logger.instance.debug 'Author copyright information found: ' + res.join("\n")
+        Logger.instance.debug 'Author copyright information found: ' + 
+          res.join("\n")
       else
         Logger.instance.debug 'Author copyright information not found'
       end
@@ -263,6 +276,7 @@ module DrupalProject
       put_in_file 'copyright', res.join("\n")
     end
 
+    # Creates the debian/control file
     def setup_control
       put_in_file 'control', ['Source: %s' % @pkgname,
                               'Section: web',
@@ -279,6 +293,7 @@ module DrupalProject
                               long_descr].join("\n")
     end
 
+    # Creates the debian/rules file
     def setup_rules
       res = ['#!/usr/bin/make -f',
              '# This debian/rules file has been autogenerated by',
@@ -318,40 +333,52 @@ module DrupalProject
       File.chmod(0755, File.join(@instdir, 'debian', 'rules'))
     end
 
+    # Creates the debian/dirs file
     def setup_dirs
       destdir = '/usr/share/drupal%d/%s/%s' % [@d_ver, @project.p_type.dir,
                                                @project.name]
       put_in_file 'dirs', destdir
     end
 
+    # Builds a short description for the package
     def short_descr
       '%s %s for Drupal %s' % [@project.name, @project.p_type.human, @d_ver]
     end
 
+    # Gets the long description for the package
     def long_descr
       @project.descr.word_wrap.prefix
     end
 
+    # Returns the list of files and directories at the top level of
+    # this project's hierarchy
     def files_at_root
-      @filelist.reject {|f| f =~ /\//}
+      @filelist.reject {|f| f =~ /\/./}
     end
 
+    # Returns the changelog's filename, if one is found
     def find_changelog
-      files_at_root.select {|f| f =~ /changelog/i}
+      files_at_root.select {|f| f =~ /^(changelog|changes)/i}
     end
 
+    # Returns the license's filename, if one is found
     def find_license
       files_at_root.select {|f| f =~ /license/i}
     end
 
+    # Returns the project's documentation files, if found - All the
+    # .txt files, excluding changelog and license
     def find_docs
       files_at_root.select {|f| f =~ /\.txt$/} - find_changelog - find_license
     end
 
+    # The list of files to copy to the debianized package
     def files_to_install
       files_at_root - find_changelog - find_license - find_docs
     end
 
+    # Creates the specified file inside the debian/ directory, with
+    # the contents received as the second parameter
     def put_in_file(filename, data)
       File.open(File.join(@instdir, 'debian', filename), 'w') do |f|
         f.puts data
