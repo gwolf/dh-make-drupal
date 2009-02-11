@@ -59,6 +59,13 @@ DESC
            :opt_description => 'Prepare the debianized directory, but omit ' +
            'the actual package build process. This option is incompatible ' +
            'with either -D and -r.')
+    option(:names => %w(--build-switches),
+           :opt_found => get_args,
+           :opt_not_found => '-us -uc',
+           :opt_description => 'Switches to pass to dpkg-buildpackage. ' +
+           'Defaults to "-us -uc" (do not sign the generated package). ' +
+           'In order not to give any switches, specify an empty quoted ' +
+           'string (i.e. --build-switches=\'\').')
     option(:names => %w(--debug),
            :opt_found => get_args,
            :opt_not_found => 1,
@@ -78,6 +85,7 @@ DESC
     report_only = opt['-r']
     debianize = ! opt['-D']
     skip_build = opt['-b']
+    switches = opt['--build-switches']
 
     DrupalProject::Logger.instance.level = debug
 
@@ -94,7 +102,7 @@ DESC
     if debianize
       deb = DrupalProject::DebianPackager.new(down) 
       deb.build_structure
-      deb.build_package unless skip_build
+      deb.build_package(switches) unless skip_build
     end
   end
 end
@@ -155,6 +163,8 @@ module DrupalProject
       Logger.instance.info 'Debian package name: %s' % @pkgname
     end
 
+    # Unpacks the downloaded tarball and creates the Debian package
+    # structure in it
     def build_structure
       setup_directory
       setup_changelog
@@ -166,7 +176,19 @@ module DrupalProject
       setup_rules
     end
 
-    def build_package
+    # Builds the Debian package from the created directory structure
+    def build_package(switches)
+      if ! File.exists? '/usr/bin/dpkg-buildpackage'
+        Logger.instance.error 'dpkg-buildpackage not found - Cannot build ' +
+          'the generated package.'
+        exit 1
+      end
+
+      cmdline = '/usr/bin/dpkg-buildpackage %s' % switches
+      Logger.instance.info 'Starting Debian package build'
+      Logger.instance.debug 'Invoking external command: %s' % cmdline
+
+      system('cd %s && %s 2>&1' % [@instdir, cmdline])
     end
 
     private
