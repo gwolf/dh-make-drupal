@@ -307,10 +307,11 @@ module DrupalProject
                                                        @maint_mail],
                               'Build-Depends: debhelper (>> 5.0.0)',
                               'Standards-Version: 3.8.0',
+                              'Homepage: %s' % @project.url,
                               '',
                               'Package: %s' % @pkgname,
                               'Architecture: all',
-                              'Depends: drupal%s' % @d_ver,
+                              'Depends: drupal%s, ${misc:Depends}' % @d_ver,
                               'Description: %s' % short_descr,
                               long_descr].join("\n")
     end
@@ -479,14 +480,14 @@ module DrupalProject
   end
 
   class Project
-    attr_accessor :name, :p_type, :descr, :author, :creation, :html
+    attr_accessor :name, :url, :p_type, :descr, :author, :creation, :html
     def initialize(pr_name)
       @name = pr_name
-      url = "http://drupal.org/project/#{pr_name}"
-      Logger.instance.debug "Fetching project information from #{url}"
+      @url = "http://drupal.org/project/#{pr_name}"
+      Logger.instance.debug "Fetching project information from #{@url}"
 
-      @html = Hpricot(open(url)) or 
-        raise IOError, "Could not open #{name} project website at #{url}"
+      @html = Hpricot(open(@url)) or 
+        raise IOError, "Could not open #{name} project website at #{@url}"
 
       # Get the project description. Fetch only the first paragraph -
       # This is usually enough for the .deb, and it should be
