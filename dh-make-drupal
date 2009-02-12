@@ -90,7 +90,15 @@ DESC
     DrupalProject::Logger.instance.level = debug
 
     down = DrupalProject::Downloader.new(@project, d_ver, min_status)
-    down.download unless report_only
+    if report_only
+      puts "Highest available version for %s (Drupal %s, status >= %s):" %
+        [@project, d_ver, min_status]
+      puts "Project page: %s" % down.release.project.url
+      puts "Release: %s (%s)" % [down.release.version, down.release.sym_status]
+      puts "Download URL: %s)" % down.release.url
+    else
+      down.download 
+    end
 
     if report_only and debianize
       DrupalProject::Logger.instance.info('--report-only (-r) implies ' +
@@ -365,7 +373,8 @@ module DrupalProject
 
     # Builds a short description for the package
     def short_descr
-      '%s %s for Drupal %s' % [@project.name, @project.p_type.human, @d_ver]
+      '%s %s for Drupal %s' % [@project.name, @project.p_type.human.downcase,
+                               @d_ver]
     end
 
     # Gets the long description for the package
