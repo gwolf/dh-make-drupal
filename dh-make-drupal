@@ -379,7 +379,8 @@ module DrupalProject
 
     # Gets the long description for the package
     def long_descr
-      @project.descr.word_wrap.prefix
+      ( "%s\n\nThis is an auto-generated description made by dh-make-drupal." %
+        @project.descr ).word_wrap.prefix
     end
 
     # Returns the list of files and directories at the top level of
