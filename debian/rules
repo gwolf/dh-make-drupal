@@ -1,0 +1,28 @@
+#!/usr/bin/make -f
+
+PACKAGE = dh-make-drupal
+BUILDDIR = "$(CURDIR)/debian/$(PACKAGE)"
+
+build: build-stamp
+build-stamp:
+	dh build
+	touch build-stamp
+
+clean:
+	dh clean
+
+install: build install-stamp
+install-stamp:
+	dh install
+	install dh-make-drupal $(BUILDDIR)/usr/bin
+	dh_installman debian/dh-make-drupal.1
+	touch install-stamp
+
+binary-arch: install
+	dh binary-arch
+
+binary-indep: install
+	dh_compress
+	dh binary-indep
+
+binary: binary-arch binary-indep

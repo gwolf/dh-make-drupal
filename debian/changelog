@@ -1,0 +1,5 @@
+dh-make-drupal (0.1-1) unstable; urgency=low
+
+  * Initial release. (Closes: #514786)
+
+ -- Gunnar Wolf <gwolf@debian.org>  Mon, 16 Feb 2009 11:22:31 -0600

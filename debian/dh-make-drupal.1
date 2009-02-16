@@ -1,0 +1,60 @@
+.TH dh-make-drupal 1 "February 16, 2009"
+.SH NAME
+dh-make-drupal - Builds a Debian package for the requested Drupal project
+.SH SYNOPSIS
+.B dh-make-drupal
+[options] project_name
+.SH DESCRIPTION
+The purpose of this program is to generate Debian packages for any Drupal
+projects (that is, modules or themes). 
+
+Given that Drupal developers publish their work through the main Drupal 
+site (http://drupal.org), this program fetches the information for the
+latest available versions (for the right Drupal release, and with the 
+specified stability level), and prepares a Debian package from it.
+
+This Debian package can be locally installed using 'dpkg', or uploaded to your
+Apt repository.
+
+Keep in mind that this package only goes as far as it can, being an automated 
+tool. The generated packages will probably require verification/tweaking to
+be of production quality.
+
+This program has been inspired -and named in a similar fashion to- Debian's
+pkg-perl group's dh-make-perl.
+.SH OPTIONS
+.TP 8
+.B \-d, \-\-drupal-version version
+Drupal version
+.TP 8
+.B \-r, \-\-report-only
+Check only for project availability, don't download or perform any other
+actions locally. Implies -D.
+.TP 8
+.B \-s, \-\-min-status
+Minimum status to consider for packaging. Accepted values: 'recommended',
+\'supported\', 'developer'. Defaults to recommended.
+.TP 8
+.B \-D, \-\-dont-debianize
+ Do not attempt to debianize the project, only download the tarball
+.TP 8
+.B \-b, \-\-no-build
+Prepare the debianized directory, but omit the actual package build
+process. This option is incompatible with either -D and -r.
+.TP 8
+.B \-\-build-switches
+Switches to pass to dpkg-buildpackage. Defaults to "-us -uc" (do not sign
+the generated package). In order not to give any switches, specify an
+empty quoted string (i.e. --build-switches='').
+.TP 8
+.B \-\-debug level
+Debug level for generated messages (0=highest, 5=lowest)
+.TP 8
+.B \-v, \-\-version                    
+Displays application version
+.TP 8
+.B \-h, \-\-help
+Displays help page
+.SH AUTHOR
+AUTHOR:  Gunnar Wolf
+COPYRIGHT (c) Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009
