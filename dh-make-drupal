@@ -1,5 +1,5 @@
 #!/usr/bin/ruby
-#
+
 # dh-make-drupal
 #
 # Creates Debian packages from Drupal projects (modules, themes).
@@ -18,12 +18,16 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-require 'yaml'
+
 require 'commandline'
-require 'singleton'
+require 'digest/md5'
 require 'etc'
 require 'ftools'
-require 'digest/md5'
+require 'hpricot'
+require 'open-uri'
+require 'singleton'
+require 'yaml'
+
 
 class App < CommandLine::Application
   def initialize
@@ -547,9 +551,6 @@ module DrupalProject
   # Fetches the list of available versions for a given project, and
   # allows for filtering it to match the user's requested criteria
   class VersionsList < Array
-    require 'hpricot'
-    require 'open-uri'
-
     attr_accessor :project
     # Builds the list of available versions for the requested project
     def self.for(proj_name)
