@@ -234,9 +234,11 @@ module DrupalProject
       # so... it stays until a better way is found :) Just check if
       # the basic assumption holds before unpacking.
       @filelist = IO.popen('tar tzf %s' % @tarball).readlines.map do |file|
-        raise RuntimeError,('Downloaded file %s has an unexpected '+
-                            'directory hierarchy (%s) - Aborting.') %
-          [@tarball, file] unless file.gsub!(/^#{@project.name}\//, '')
+        if @project.p_type.ck_tar_in_dir?
+          raise RuntimeError,('Downloaded file %s has an unexpected '+
+                              'directory hierarchy (%s) - Aborting.') %
+            [@tarball, file] unless file.gsub!(/^#{@project.name}\//, '')
+        end
         file.gsub(/\n$/, '')
       end.reject {|file| file.empty?}
       Logger.instance.debug('Original tarball verified - %s files included' %
@@ -245,8 +247,13 @@ module DrupalProject
 
     # Sets up the directory for starting the Debian packaging
     def setup_directory
-      system("tar xzf #{@tarball}")
-      File.rename(@project.name, @instdir)
+      if @project.p_type.ck_tar_in_dir?
+        system("tar xzf #{@tarball}")
+        File.rename(@project.name, @instdir)
+      else
+        Dir.mkdir(@instdir)
+        system("cd #{@instdir}; tar xzf ../#{@tarball}")
+      end
       Dir.mkdir(File.join(@instdir, 'debian'))
     end
 
@@ -466,17 +473,24 @@ module DrupalProject
   # Stores the basic settings on how to treat the different kind of
   # projects available through the Drupal website.
   #
-  # Currently we are only dealing with modules and themes. The other
-  # available types (translations, theme engines, installation
-  # profiles and drupal project) are outside our scope - although for
-  # some of them, this codecould be trivially expanded.
+  # Currently we are only dealing with modules, themes and
+  # translations. The other available types (theme engines,
+  # installation profiles and drupal project) are outside our scope -
+  # although for some of them, this code could be trivially expanded.
   class ProjType
     Known = {'Modules' => {:human => 'Module', 
         :name_part => 'mod',
-        :dir => 'modules'},
+        :ck_tar_in_dir => true,
+        :dir => 'modules'
+      },
       'Themes' => {:human => 'Theme', 
         :name_part => 'thm',
-        :dir => 'themes'}
+        :ck_tar_in_dir => true,
+        :dir => 'themes'},
+      'Translations' => {:human => 'Translation',
+        :name_part => 'trans',
+        :ck_tar_in_dir => false,
+        :dir => ''}
     }
 
     # Takes the type string (as reported by each project in the
@@ -495,6 +509,9 @@ module DrupalProject
 
     # The particle to add in the generated package name
     def name_part; Known[@key][:name_part];end
+
+    # Whether to check the tarball structure for this particular project type
+    def ck_tar_in_dir?; Known[@key][:ck_tar_in_dir]; end
   end
 
   class Author
