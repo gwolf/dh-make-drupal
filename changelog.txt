@@ -1,0 +1,5 @@
+0.2 - 2009-02-19
+ * Updated release fetching code, due to a new webpage layout
+
+0.1 - 2009-02-16
+ * Initial release
