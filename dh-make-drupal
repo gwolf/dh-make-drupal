@@ -581,7 +581,9 @@ module DrupalProject
       # releases" and "development snapshots" are given as two
       # tables. We should look for the highest (i.e. stablest) release
       # we can get.
-      list.project.html.search('table[@class="releases"]').each do |table|
+      list.project.html.search('table').
+        select {|t| t.attributes['class'] =~ /releases/}.
+        each do |table|
         (table/'tr').each do |tr|
           rel = Release.from_tr(tr) or next
           rel.project = list.project
