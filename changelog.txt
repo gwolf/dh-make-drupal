@@ -1,5 +1,6 @@
 0.2 - 2009-02-19
  * Updated release fetching code, due to a new webpage layout
+ * Added the needed logic to also package translations
 
 0.1 - 2009-02-16
  * Initial release
