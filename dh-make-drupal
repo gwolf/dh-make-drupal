@@ -2,7 +2,7 @@
 
 # dh-make-drupal
 #
-# Creates Debian packages from Drupal projects (modules, themes).
+# Creates Debian packages from Drupal projects (modules, themes, translations).
 # Copyright (C) 2009 Gunnar Wolf <gwolf@gwolf.org>
 # Instituto de Investigaciones Económicas - UNAM
 #
@@ -31,13 +31,13 @@ require 'yaml'
 
 class App < CommandLine::Application
   def initialize
-    version '0.1'
+    version '0.2'
     author 'Gunnar Wolf'
     copyright 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009'
     short_description 'Builds a Debian package for the requested Drupal project'
     long_description <<DESC
 The purpose of this program is to generate Debian packages for any Drupal
-projects (that is, modules or themes). 
+projects (that is, modules, themes or translations). 
 
 Given that Drupal developers publish their work through the main Drupal 
 site (http://drupal.org), this program fetches the information for the
@@ -189,6 +189,10 @@ module DrupalProject
                                       @project.name]).gsub( /_/, '-')
       @tarball = down.filename
       @instdir = '%s-%s' % [@pkgname, @release.version]
+      @builddir = '/usr/share/drupal%d' % @d_ver
+      if @project.p_type.ck_tar_in_dir?
+        @builddir = File.join(@builddir, @project.p_type.dir, @project.name )
+      end
 
       ck_orig_tarball
       Logger.instance.info 'Debian package name: %s' % @pkgname
@@ -228,15 +232,17 @@ module DrupalProject
     # information. Raises a RuntimeError if it does not look right.
     def ck_orig_tarball
       @filelist = []
-      # We make a huge assumption here: That the downloaded tar.gz
-      # contains everyghing under a directory named just as the
-      # project. That seems to be the rule under the Drupal community,
-      # so... it stays until a better way is found :) Just check if
-      # the basic assumption holds before unpacking.
+
       @filelist = IO.popen('tar tzf %s' % @tarball).readlines.map do |file|
-        raise RuntimeError,('Downloaded file %s has an unexpected '+
-                            'directory hierarchy (%s) - Aborting.') %
-          [@tarball, file] unless file.gsub!(/^#{@project.name}\//, '')
+        if @project.p_type.ck_tar_in_dir?
+          # Project types which ship their whole contents inside a
+          # directory with the same name as themselves (modules,
+          # themes): Refuse to continue if there are files I don't know
+          # how to handle (i.e. are not in the expected place)
+          raise RuntimeError,('Downloaded file %s has an unexpected '+
+                              'directory hierarchy (%s) - Aborting.') %
+            [@tarball, file] unless file.gsub!(/^#{@project.name}\//, '')
+        end
         file.gsub(/\n$/, '')
       end.reject {|file| file.empty?}
       Logger.instance.debug('Original tarball verified - %s files included' %
@@ -245,8 +251,13 @@ module DrupalProject
 
     # Sets up the directory for starting the Debian packaging
     def setup_directory
-      system("tar xzf #{@tarball}")
-      File.rename(@project.name, @instdir)
+      if @project.p_type.ck_tar_in_dir?
+        system("tar xzf #{@tarball}")
+        File.rename(@project.name, @instdir)
+      else
+        Dir.mkdir(@instdir)
+        system("cd #{@instdir}; tar xzf ../#{@tarball}")
+      end
       Dir.mkdir(File.join(@instdir, 'debian'))
     end
 
@@ -357,8 +368,7 @@ module DrupalProject
              '# Uncomment this to turn on verbose mode',
              '#export DH_VERBOSE=1',
              'DESTDIR = $(CURDIR)/debian/%s' % @pkgname, 
-             'BUILDDIR = $(DESTDIR)/usr/share/drupal%d/%s/%s' %
-             [@d_ver, @project.p_type.dir, @project.name],
+             'BUILDDIR = $(DESTDIR)/%s' % @builddir,
              ''
             ]
 
@@ -389,9 +399,10 @@ module DrupalProject
 
     # Creates the debian/dirs file
     def setup_dirs
-      destdir = '/usr/share/drupal%d/%s/%s' % [@d_ver, @project.p_type.dir,
-                                               @project.name]
-      put_in_file 'dirs', destdir
+      subdirs = subdirs_for(@instdir).reject {|d| d =~ /^#{@instdir}.debian/}
+
+      dirs = [@builddir, subdirs.map {|d| File.join(@builddir,d)}].flatten
+      put_in_file 'dirs', dirs.join("\n")
     end
 
     # Builds a short description for the package
@@ -409,7 +420,7 @@ module DrupalProject
     # Returns the list of files and directories at the top level of
     # this project's hierarchy
     def files_at_root
-      @filelist.reject {|f| f =~ /\/./}
+      @filelist.map {|f| f.gsub /\/.*/, ''}.uniq
     end
 
     # Returns the changelog's filename, if one is found
@@ -440,6 +451,18 @@ module DrupalProject
         f.puts data
       end
     end
+
+    def subdirs_for(dir)
+      res=[dir]
+      ignore = ['.', '..']
+      Dir.open(dir).each do |subdir|
+        full = File.join(dir,subdir)
+        next if ignore.include?(subdir)
+        next unless FileTest.directory?(full)
+        res << subdirs_for(full)
+      end
+      res.flatten.uniq
+    end
   end
 
   class RulesTarget 
@@ -466,17 +489,24 @@ module DrupalProject
   # Stores the basic settings on how to treat the different kind of
   # projects available through the Drupal website.
   #
-  # Currently we are only dealing with modules and themes. The other
-  # available types (translations, theme engines, installation
-  # profiles and drupal project) are outside our scope - although for
-  # some of them, this codecould be trivially expanded.
+  # Currently we are only dealing with modules, themes and
+  # translations. The other available types (theme engines,
+  # installation profiles and drupal project) are outside our scope -
+  # although for some of them, this code could be trivially expanded.
   class ProjType
     Known = {'Modules' => {:human => 'Module', 
         :name_part => 'mod',
-        :dir => 'modules'},
+        :ck_tar_in_dir => true,
+        :dir => 'modules'
+      },
       'Themes' => {:human => 'Theme', 
         :name_part => 'thm',
-        :dir => 'themes'}
+        :ck_tar_in_dir => true,
+        :dir => 'themes'},
+      'Translations' => {:human => 'Translation',
+        :name_part => 'trans',
+        :ck_tar_in_dir => false,
+        :dir => ''}
     }
 
     # Takes the type string (as reported by each project in the
@@ -495,6 +525,9 @@ module DrupalProject
 
     # The particle to add in the generated package name
     def name_part; Known[@key][:name_part];end
+
+    # Whether to check the tarball structure for this particular project type
+    def ck_tar_in_dir?; Known[@key][:ck_tar_in_dir]; end
   end
 
   class Author
@@ -564,7 +597,9 @@ module DrupalProject
       # releases" and "development snapshots" are given as two
       # tables. We should look for the highest (i.e. stablest) release
       # we can get.
-      list.project.html.search('table[@class="releases"]').each do |table|
+      list.project.html.search('table').
+        select {|t| t.attributes['class'] =~ /releases/}.
+        each do |table|
         (table/'tr').each do |tr|
           rel = Release.from_tr(tr) or next
           rel.project = list.project
