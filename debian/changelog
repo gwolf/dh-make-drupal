@@ -1,3 +1,11 @@
+dh-make-drupal (0.2-1) unstable; urgency=low
+
+  * New upstream release
+  * Fixes changes in the upstream webpage layout which rendered the
+    package useless
+
+ -- Gunnar Wolf <gwolf@debian.org>  Thu, 19 Feb 2009 18:30:59 -0600
+
 dh-make-drupal (0.1-1) unstable; urgency=low
 
   * Initial release. (Closes: #514786)
