@@ -185,11 +185,10 @@ module DrupalProject
       @author = @project.author
       @maint_name = Etc::getpwuid.gecos.gsub /,+$/, ''
       @maint_mail = ENV['EMAIL']
-      @pkgname = ('drupal%s-%s-%s' % [@d_ver, @project.p_type.name_part, 
-                                      @project.name]).gsub( /_/, '-')
+      @pkgname = PackageName.for(@project.name, @project.p_type, @d_ver)
       @tarball = down.filename
       @instdir = '%s-%s' % [@pkgname, @release.version]
-      @builddir = '/usr/share/drupal%d' % @d_ver
+      @builddir = '/usr/share/drupal%s' % @d_ver
       if @project.p_type.ck_tar_in_dir?
         @builddir = File.join(@builddir, @project.p_type.dir, @project.name )
       end
@@ -342,6 +341,7 @@ module DrupalProject
 
     # Creates the debian/control file
     def setup_control
+      depends = Dependencies.new(@release, @instdir)
       put_in_file 'control', ['Source: %s' % @pkgname,
                               'Section: web',
                               'Priority: extra',
@@ -353,7 +353,7 @@ module DrupalProject
                               '',
                               'Package: %s' % @pkgname,
                               'Architecture: all',
-                              'Depends: drupal%s, ${misc:Depends}' % @d_ver,
+                              'Depends: %s' % depends.get,
                               'Description: %s' % short_descr,
                               long_descr].join("\n")
     end
@@ -483,6 +483,85 @@ module DrupalProject
       @cmds.each {|cmd| res << "\t%s" % cmd}
       res << ''
       return res.join("\n")
+    end
+  end
+
+  # Generates the package name for a given project name and type
+  # (#ProjType), for the specified Drupal version.
+  class PackageName
+    def self.for(name, type, d_ver)
+      ('drupal%s-%s-%s' % [d_ver, type.name_part, name]).gsub(/_/, '-')
+    end
+  end
+
+  # Dependency-related information is (currently?) only expressed in
+  # the {module}.info file inside the tarball and can thus only be
+  # gathered once the module is unpacked.
+  # 
+  # All dependencies are expected to be on modules. If this
+  # contradicts reality... I'll be glad to change it, I guess :)
+  class Dependencies
+    class Irrelevant < Exception; end
+    # Core Drupal dependencies were gathered by:
+    #
+    # $ dpkg -L drupal5 | grep modules |cut -d / -f 6|sort|uniq
+    # (and equivalent for drupal6).
+    CoreDrupalModules = {'5' => %w(aggregator block blog blogapi book color 
+        comment contact drupal filter forum help legacy locale menu node path 
+        ping poll profile search statistics system taxonomy throttle tracker 
+        upload user watchdog),
+      '6' => %w(aggregator block blog blogapi book color comment contact dblog 
+        filter forum help locale menu node openid path php ping poll profile 
+        search statistics syslog system taxonomy throttle tracker translation 
+        trigger update upload user)}
+
+    # Builds the dependency lists from the information declared in the
+    # project's .info file
+    def initialize(release, basedir)
+      @d_ver = release.drupal_version
+      @depends = ['${misc:Depends}', 'drupal%s' % @d_ver]
+      
+      begin
+        filename = File.join(basedir, '%s.info' % release.project.name)
+        File.open(filename).lines.each { |info_fh| parse_depends(info_fh) }
+      rescue Errno::EACCES, Errno::ENOENT
+        Logger.instance.warn('Expected .info file (%s) not found or not ' +
+                             'readable. Cannot fetch dependency information.')
+      end
+    end
+
+    # Fetches the list of Debian package dependencies. It is handed
+    # back as a string, ready to put straight in the 'Depends' field.
+    def get
+      @depends.join(', ')
+    end
+
+    private
+    # Parse the dependencies declared in the .info file; skip those
+    # which are part of the core Drupal installation
+    def parse_depends(line)
+      begin
+        raise Irrelevant unless line and
+          line =~ /dependencies\[.*\]\s*=\s*(.*)\n?/
+        dep = $1
+        begin
+          if CoreDrupalModules[@d_ver].include?(dep)
+            Logger.instance.debug(('Declared dependency %s is part of ' +
+                                   'Drupal %s core - Skipping') % 
+                                  [dep, @d_ver])
+            raise Irrelevant
+          end
+        rescue NoMethodError
+          Logger.instance.warn(('No list of core modules available for ' +
+                                'Drupal version %s - Cannot infer what ' +
+                                'to exclude, including everything.') % @d_ver)
+        end
+        dep_pkg = PackageName.for(dep, ProjType.new('Modules'), @d_ver)
+        Logger.instance.info('Adding dependency on %s' % dep_pkg)
+        @depends << dep_pkg
+      rescue Irrelevant
+        # Just skip it, it's irrelevant!
+      end
     end
   end
 
