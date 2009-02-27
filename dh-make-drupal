@@ -102,43 +102,51 @@ DESC
   end
 
   def main
-    d_ver = opt['-d']
-    min_status = opt['-s']
-    debug = opt['--debug'] 
-    report_only = opt['-r']
-    debianize = ! opt['-D']
-    skip_build = opt['-b']
-    switches = opt['--build-switches']
+    o = DrupalProject::Options
+    log = DrupalProject::Logger.instance
+    log.level = opt['--debug']
 
-    DrupalProject::Logger.instance.level = debug
+    o.d_ver = opt['-d']
+    o.min_status = opt['-s']
+    o.debug = opt['--debug'] 
+    o.report_only = opt['-r']
+    o.debianize = ! opt['-D']
+    o.skip_build = opt['-b']
+    o.switches = opt['--build-switches']
 
-    down = DrupalProject::Downloader.new(@project, d_ver, min_status)
-    if report_only
-      puts "Highest available version for %s (Drupal %s, status >= %s):" %
-        [@project, d_ver, min_status]
-      puts "Project page: %s" % down.release.project.url
-      puts "Release: %s (%s)" % [down.release.version, down.release.sym_status]
-      puts "Download URL: %s)" % down.release.url
-    else
+    begin
+      down = DrupalProject::Downloader.new(@project, o.d_ver, o.min_status)
       down.download 
-    end
 
-    if report_only and debianize
-      DrupalProject::Logger.instance.info('--report-only (-r) implies ' +
-                                          '--dont-debianize (-D) - Skipping '+
-                                          'Debian package creation.')
-      debianize = false
-    end
-
-    if debianize
       deb = DrupalProject::DebianPackager.new(down) 
       deb.build_structure
-      deb.build_package(switches) unless skip_build
+      deb.build_package(switches)
+    rescue DrupalProject::SkipRequested
+      # All fine, nothing to see, please move along
     end
   end
 end
 
 module DrupalProject
+  class SkipRequested < Exception; end
+  # This class acts basically as an universally available hash, with
+  # some syntactic sugar. Calling any method ending in '=' will assign
+  # the specified value to that key, and calling any method not ending
+  # in '=' will give back the value. For extra bonus points, logs
+  # options changes if so requested.
+  class Options
+    @@opts = {}
+    def self.method_missing(meth,*args)
+      attr = meth.to_s
+      if attr.gsub! /\=$/,''
+        Logger.instance.debug("Setting configuration key «%s» to «%s»" % 
+                              [attr, args.to_s] )
+        @@opts[attr] = args.length<2 ? args[0] : args
+      end
+      @@opts[attr]
+    end
+  end
+
   # Finds the needed information for a given project's files
   # (corresponding to the specified Drupal release and minimum
   # stability level indicated), and allows for downloading it
@@ -170,6 +178,15 @@ module DrupalProject
     # (i.e. drupal6-og_1.1.orig.tar.gz), not the usual Drupal scheme
     # (og-6.x-1.1.tar.gz).
     def download
+      if Options.report_only
+        Logger.instance.info 'Reporting only, as requested in the command line'
+        puts "Highest available version for %s (Drupal %s, status >= %s):" %
+          [@project, @d_ver, @status]
+        puts "Project page: %s" % release.project.url
+        puts "Release: %s (%s)" % [release.version, release.sym_status]
+        puts "Download URL: %s)" % release.url
+        raise SkipRequested
+      end
       @release.save_file
       @filename = release.dest_file
     end
@@ -177,6 +194,12 @@ module DrupalProject
 
   class DebianPackager
     def initialize(down)
+      if ! Options.debianize
+        Logger.instance.debug('Skipping Debian package creation as ' +
+                              'requested at command line')
+        raise SkipRequested
+      end
+
       Logger.instance.debug 'Starting Debian package creation'
       @d_ver = down.d_ver
       @release = down.release
@@ -212,6 +235,11 @@ module DrupalProject
 
     # Builds the Debian package from the created directory structure
     def build_package(switches)
+      if Options.skip_build
+        Logger.instance.debug('Skipping Debian package build as requested at ' +
+                              'command line')
+        raise SkipRequested
+      end
       if ! File.exists? '/usr/bin/dpkg-buildpackage'
         Logger.instance.error 'dpkg-buildpackage not found - Cannot build ' +
           'the generated package.'
