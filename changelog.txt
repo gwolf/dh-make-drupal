@@ -2,6 +2,8 @@
  * Added dependency parsing/declaration for modules
  * Options are now handled through the DrupalProject::Options class,
    allowing for a cleaner flow and separation of concerns
+ * Can also now start from a local tarball, no longer needs to fetch
+   data from the Drupal website
 
 0.2 - 2009-02-19
  * Updated release fetching code, due to a new webpage layout
