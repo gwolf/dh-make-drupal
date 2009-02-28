@@ -22,16 +22,17 @@
 require 'commandline'
 require 'digest/md5'
 require 'etc'
-require 'ftools'
+require 'fileutils'
 require 'hpricot'
 require 'open-uri'
 require 'singleton'
+require 'tmpdir'
 require 'yaml'
 
 
 class App < CommandLine::Application
   def initialize
-    version '0.2'
+    version '0.3'
     author 'Gunnar Wolf'
     copyright 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009'
     short_description 'Builds a Debian package for the requested Drupal project'
@@ -56,6 +57,7 @@ pkg-perl group's dh-make-perl.
 DESC
     synopsis '[options] project_name'
     statuses = DrupalProject::Release::statuses
+    projtypes = DrupalProject::ProjType::Known.keys.sort
 
     option(:names => %w(-d --drupal-version), 
            :opt_found => get_args,
@@ -65,9 +67,15 @@ DESC
     option(:flag, :names => %w(-r --report-only),
            :opt_description => "Check only for project availability, " +
            "don't download or perform any other actions locally. Implies -D.")
-#    option(:flag, :names => %w(--force -f),
-#           :opt_description  => 'Proceed even if this will overwrite ' +
-#           'currently existing files')
+    option(:flag, :names => %w(-f --force),
+           :opt_description  => 'Proceed even if this will overwrite ' +
+           'currently existing files')
+    option(:names => %w(--debug),
+           :opt_found => get_args,
+           :opt_not_found => 1,
+           :opt_description => 'Debug level for generated messages ' +
+           '(0=highest, 5=lowest)',
+           :arg_description => 'level')
     option(:names => %w(-s --min-status),
            :opt_found => get_args,
            :opt_not_found => statuses[0],
@@ -89,12 +97,31 @@ DESC
            'Defaults to "-us -uc" (do not sign the generated package). ' +
            'In order not to give any switches, specify an empty quoted ' +
            'string (i.e. --build-switches=\'\').')
-    option(:names => %w(--debug),
+    option(:names => %w(-t --tarball),
            :opt_found => get_args,
-           :opt_not_found => 1,
-           :opt_description => 'Debug level for generated messages ' +
-           '(0=highest, 5=lowest)',
-           :arg_description => 'level')
+           :opt_description => 'Use the specified tarball as the original ' +
+           'project tar.gz, don\'t look for any other available versions ' +
+           'and don\'t download from the Drupal website. This will require ' +
+           'you also to provide a project version number with -V and the ' +
+           'project type with -T',
+           :arg_description => 'tarball'
+           )
+    option(:names => %w(-T --proj-type),
+           :opt_found => get_args,
+           :opt_description => 'Type of project we are packaging. This ' +
+           'option is only meaningful when working on a local tarball (-t), ' +
+           'and will be ignored otherwise. Accepted values: %s. Defaults ' +
+           'to %s.' % [ projtypes, projtypes[0] ],
+           :opt_not_found => projtypes[0],
+           :arg_description => 'projtype'
+           )
+    option(:names => %w(-V --proj-version),
+           :opt_found => get_args,
+           :opt_description => 'Provide a project version number. This ' +
+           'option is only meaningful when working on a local tarball (-t), ' +
+           'and will be ignored otherwise',
+           :arg_description => 'version'
+           )
     option :version, :names => %w(-v --version)
     option :help, :names => %w(-h --help)
 
@@ -108,19 +135,38 @@ DESC
 
     o.d_ver = opt['-d']
     o.min_status = opt['-s']
+    o.force_overwrite = opt['-f']
     o.debug = opt['--debug'] 
     o.report_only = opt['-r']
     o.debianize = ! opt['-D']
     o.skip_build = opt['-b']
     o.switches = opt['--build-switches']
+    o.tarball = opt['-t']
+    o.proj_version = opt['-V']
+    o.proj_type = opt['-T']
 
     begin
-      down = DrupalProject::Downloader.new(@project, o.d_ver, o.min_status)
-      down.download 
+      if o.tarball
+        begin
+          down = DrupalProject::Downloader.mock(@project, o.d_ver, 
+                                                o.tarball, o.proj_version)
+        rescue DrupalProject::Downloader::LackingMock
+          log.error 'Missing information: Project name, tarball and project ' +
+            'version are required when working with a local tarball.'
+          exit 1
+        rescue Errno::ENOENT
+          log.error 'Specified tarball (%s) does not exist, cannot continue' %
+            o.tarball
+          exit 1
+        end
+      else
+        down = DrupalProject::Downloader.new(@project, o.d_ver, o.min_status)
+        down.download 
+      end
 
       deb = DrupalProject::DebianPackager.new(down) 
       deb.build_structure
-      deb.build_package(switches)
+      deb.build_package(o.switches)
     rescue DrupalProject::SkipRequested
       # All fine, nothing to see, please move along
     end
@@ -151,6 +197,7 @@ module DrupalProject
   # (corresponding to the specified Drupal release and minimum
   # stability level indicated), and allows for downloading it
   class Downloader
+    class LackingMock < Exception; end
     attr_accessor :release, :project, :d_ver, :filename
     # Fetches the needed information from the Drupal website. The
     # project name is specified as the first parameter; the Drupal
@@ -160,15 +207,30 @@ module DrupalProject
     # decreasing order) :recommended, :supported or :developer,
     # defaulting to :recommended.
     def initialize(project, d_ver=6, status=:recommended)
-      Logger.instance.debug(("Preparing package for '%s' for Drupal %s, "+
-                             "status >= %s") % [project, d_ver, status])
       @project = project
       @d_ver = d_ver
-      @release = DrupalProject::VersionsList.for(@project).
-        choose(d_ver, status)
-      Logger.instance.info "Found %s version %s (status: %s)" % 
-        [@release.project, @release.version, @release.sym_status]
-      Logger.instance.debug "Download URL: #{release.url}"
+      fetch_info(status) unless status == :mock
+    end
+
+    def self.mock(project, d_ver, tarball, proj_ver)
+      raise LackingMock unless project and d_ver and tarball and proj_ver
+      raise Errno::ENOENT unless File.exists? tarball
+
+      down = self.new(project, d_ver, :mock)
+      down.filename = tarball
+      down.release = rel = Release.new
+
+      rel.project = Project.new(project)
+      rel.project.p_type = ProjType.new(Options.proj_type)
+      rel.project.descr = 'Generated from a local file - Sorry, cannot ' +
+        'even fetch a proper description!'
+      rel.drupal_version = d_ver
+      rel.version = proj_ver
+
+      Logger.instance.debug 'Mocking download information for local file: ' +
+        down.to_yaml
+
+      down
     end
 
     # A #Downloader instantiation only gets the available
@@ -189,6 +251,17 @@ module DrupalProject
       end
       @release.save_file
       @filename = release.dest_file
+    end
+
+    private
+    def fetch_info(status)
+      Logger.instance.debug(("Preparing package for '%s' for Drupal %s, "+
+                             "status >= %s") % [project, d_ver, status])
+      @release = DrupalProject::VersionsList.for(@project).
+        choose(d_ver, status)
+      Logger.instance.info "Found %s version %s (status: %s)" % 
+        [@release.project, @release.version, @release.sym_status]
+      Logger.instance.debug "Download URL: #{release.url}"
     end
   end
 
@@ -278,14 +351,24 @@ module DrupalProject
 
     # Sets up the directory for starting the Debian packaging
     def setup_directory
-      if @project.p_type.ck_tar_in_dir?
-        system("tar xzf #{@tarball}")
-        File.rename(@project.name, @instdir)
-      else
-        Dir.mkdir(@instdir)
-        system("cd #{@instdir}; tar xzf ../#{@tarball}")
-      end
+      curdir = Dir.pwd
+      FileUtils.rm_r(@instdir) if Options.force_overwrite and
+        File.exists?(@instdir)
+      Dir.mkdir(@instdir)
       Dir.mkdir(File.join(@instdir, 'debian'))
+
+      Dir.mktmpdir do |tmpdir|
+        system("cd #{tmpdir}; tar xzf #{File.join(curdir, @tarball)}")
+
+        move_from = (@project.p_type.ck_tar_in_dir? ?
+                     File.join(tmpdir, @project.name) : tmpdir)
+
+        Dir.open(move_from).entries.reject { |e| 
+          ['.','..'].include? e 
+        }.each {|f|
+          FileUtils.mv(File.join(move_from,f), @instdir)
+        }
+      end
     end
 
     # Creates the debian/changelog file
@@ -422,7 +505,7 @@ module DrupalProject
       targets.each {|t| res << RulesTarget.new(*t).to_s}
 
       put_in_file 'rules', res.join("\n")
-      File.chmod(0755, File.join(@instdir, 'debian', 'rules'))
+      FileUtils.chmod(0755, File.join(@instdir, 'debian', 'rules'))
     end
 
     # Creates the debian/dirs file
@@ -553,8 +636,9 @@ module DrupalProject
         filename = File.join(basedir, '%s.info' % release.project.name)
         File.open(filename).lines.each { |info_fh| parse_depends(info_fh) }
       rescue Errno::EACCES, Errno::ENOENT
-        Logger.instance.warn('Expected .info file (%s) not found or not ' +
-                             'readable. Cannot fetch dependency information.')
+        Logger.instance.warn(('Expected .info file (%s) not found or not ' +
+                              'readable. Cannot fetch dependency ' +
+                              'information.') % filename)
       end
     end
 
@@ -654,9 +738,12 @@ module DrupalProject
 
   class Project
     attr_accessor :name, :url, :p_type, :descr, :author, :creation, :html
-    def initialize(pr_name)
-      @name = pr_name
-      @url = "http://drupal.org/project/#{pr_name}"
+    def initialize(name)
+      @name = name
+    end
+
+    def fetch_data
+      @url = "http://drupal.org/project/#{@name}"
       Logger.instance.debug "Fetching project information from #{@url}"
 
       @html = Hpricot(open(@url)) or 
@@ -696,6 +783,7 @@ module DrupalProject
     def self.for(proj_name)
       list = VersionsList.new
       list.project = Project.new(proj_name)
+      list.project.fetch_data
 
       # In the Drupal pages, releases are listed inside <table
       # class="releases">.
@@ -834,6 +922,10 @@ module DrupalProject
     def save_file
       Logger.instance.debug "Retreiving remote file #{@url}"
       Logger.instance.debug "Attempting to save in #{dest_file}"
+      # Ok, unlinking is not the same as overwriting, except for
+      # practical purposes :)
+      File.unlink(dest_file) if (File.exists?(dest_file) and 
+                                 Options.force_overwrite)
       begin
         if File.exists?(dest_file)
           raise Errno::EEXIST, "Destination filename for source tarball "+
