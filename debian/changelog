@@ -1,3 +1,10 @@
+dh-make-drupal (0.3-1) unstable; urgency=low
+
+  * New upstream release
+  * Updated manpage reflecting upstream changes
+
+ -- Gunnar Wolf <gwolf@debian.org>  Fri, 27 Feb 2009 19:00:21 -0600
+
 dh-make-drupal (0.2-1) unstable; urgency=low
 
   * New upstream release

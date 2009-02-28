@@ -31,6 +31,12 @@ Drupal version
 Check only for project availability, don't download or perform any other
 actions locally. Implies -D.
 .TP 8
+.B \-f, \-\-force
+Proceed even if this will overwrite currently existing files
+.TP 8
+.B \-\-debug level
+Debug level for generated messages (0=highest, 5=lowest)
+.TP 8
 .B \-s, \-\-min-status
 Minimum status to consider for packaging. Accepted values: 'recommended',
 \'supported\', 'developer'. Defaults to recommended.
@@ -47,8 +53,22 @@ Switches to pass to dpkg-buildpackage. Defaults to "-us -uc" (do not sign
 the generated package). In order not to give any switches, specify an
 empty quoted string (i.e. --build-switches='').
 .TP 8
-.B \-\-debug level
-Debug level for generated messages (0=highest, 5=lowest)
+.B     -t,--tarball tarball
+Use the specified tarball as the original project tar.gz,
+don't look for any other available versions and don't download
+from the Drupal website. This will require you also to provide
+a project version number with -V and the project type with -T
+.TP 8
+.B \-T, \-\-proj-type projtype
+Type of project we are packaging. This option is only
+meaningful when working on a local tarball (-t), and will be
+ignored otherwise. Accepted values: %s. Defaults to
+ModulesThemesTranslations.
+.TP 8
+.B \-V, \-\-proj-version version
+Provide a project version number. This option is only
+meaningful when working on a local tarball (-t), and will be
+ignored otherwise
 .TP 8
 .B \-v, \-\-version                    
 Displays application version
