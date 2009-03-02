@@ -15,7 +15,9 @@ install: build install-stamp
 install-stamp:
 	dh install
 	install dh-make-drupal $(BUILDDIR)/usr/bin
-	dh_installman debian/dh-make-drupal.1
+	help2man -s 1 -N ./dh-make-drupal \
+		--name='Builds a Debian package for the requested Drupal project' \
+		> $(BUILDDIR)/usr/share/man/man1/dh-make-drupal.1
 	touch install-stamp
 
 binary-arch: install
