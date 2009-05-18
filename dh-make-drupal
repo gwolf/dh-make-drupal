@@ -32,7 +32,7 @@ require 'yaml'
 
 class App < CommandLine::Application
   def initialize
-    version '0.3'
+    version '0.4'
     author 'Gunnar Wolf'
     copyright 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009'
     short_description 'Builds a Debian package for the requested Drupal project'
@@ -279,8 +279,8 @@ module DrupalProject
       @project = @release.project
       @version = @release.version
       @author = @project.author
-      @maint_name = Etc::getpwuid.gecos.gsub /,+$/, ''
-      @maint_mail = ENV['EMAIL']
+      @maint_name = ENV['DEBFULLNAME'] || Etc::getpwuid.gecos.gsub(/,+$/, '')
+      @maint_mail = ENV['DEBEMAIL'] || ENV['EMAIL']
       @pkgname = PackageName.for(@project.name, @project.p_type, @d_ver)
       @tarball = down.filename
       @instdir = '%s-%s' % [@pkgname, @release.version]

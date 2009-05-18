@@ -1,3 +1,7 @@
+0.4 -
+ * Use the Debian email/fullname environment variables if they are
+   found 
+
 0.3 - 2009-02-27
  * Added dependency parsing/declaration for modules
  * Options are now handled through the DrupalProject::Options class,
