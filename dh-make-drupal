@@ -925,8 +925,8 @@ module DrupalProject
 
     # Returns the filename to which this release should be saved to
     def dest_file
-      "drupal%s-%s-%s_%s.orig.tar.gz" % 
-        [drupal_version, project.p_type.name_part, project.name, version]
+      '%s_%s.orig.tar.gz' % [ PackageName.for(project.name, project.p_type, 
+                                              drupal_version), version]
     end
 
     # Fetches the this project's released tar.gz, saves it with the
