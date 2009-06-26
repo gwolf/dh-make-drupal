@@ -122,6 +122,17 @@ DESC
            'and will be ignored otherwise',
            :arg_description => 'version'
            )
+    option(:flag, :names => %w(-m --mangle-version),
+           :opt_description => 'Debian versioning logic includes the «~» ' +
+           'character meaning «anything below» the preceding version ' +
+           'number. This is most useful when dealing with pre-release ' +
+           'qualificators (in order, 1.x-dev, 1.0-alpha1, 1.0-beta, 1.0rc3). '+
+           'dh-make-drupal will try to recognize such patterns and mangle ' +
+           'them so they sort correctly in Debian (and so that when a ' +
+           'stable version is released it appears as higher - For the above ' +
+           'mentioned version numbers, they would result in 1~~dev, ' +
+           '1.0~alpha1, 1.0~beta, 1.0~rc3). You can use this switch to tell ' +
+           'dh-make-drupal to omit this mangling.')
     option :version, :names => %w(-v --version)
     option :help, :names => %w(-h --help)
 
@@ -144,6 +155,7 @@ DESC
     o.tarball = opt['-t']
     o.proj_version = opt['-V']
     o.proj_type = opt['-T']
+    o.mangle_version = ! opt['-m']
 
     begin
       if o.tarball
@@ -898,7 +910,7 @@ module DrupalProject
         return nil
       end
       rel.drupal_version = $1
-      rel.version = $2
+      rel.version = mangle($2)
 
       # Column 1 has the date this release was uploaded
       rel.date = Time.parse(columns[1].inner_text)
@@ -913,8 +925,8 @@ module DrupalProject
 
     # Returns the filename to which this release should be saved to
     def dest_file
-      "drupal%s-%s-%s_%s.orig.tar.gz" % 
-        [drupal_version, project.p_type.name_part, project.name, version]
+      '%s_%s.orig.tar.gz' % [ PackageName.for(project.name, project.p_type, 
+                                              drupal_version), version]
     end
 
     # Fetches the this project's released tar.gz, saves it with the
@@ -941,6 +953,11 @@ module DrupalProject
     def sym_status
       Statuses.each {|k,v| return k if v == @status}
       nil
+    end
+
+    def self.mangle(version)
+      return version unless Options.mangle_version
+      version.gsub(/\.x[-_.]?(dev)/, '~~\1').gsub(/[-_.]?(alpha|beta|rc)/, '~\1')
     end
   end
 
