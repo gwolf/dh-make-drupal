@@ -1,3 +1,9 @@
+dh-make-drupal (0.4-2) UNRELEASED; urgency=low
+
+  * Had Vcs-Svn field set, it should be Vcs-Git - Fixed.
+
+ -- Gunnar Wolf <gwolf@debian.org>  Fri, 26 Jun 2009 13:48:47 -0500
+
 dh-make-drupal (0.4-1) unstable; urgency=low
 
   * Auto-building manpage (via help2man, added to build-dependencies)
