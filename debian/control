@@ -3,7 +3,7 @@ Section: web
 Priority: extra
 Maintainer: Gunnar Wolf <gwolf@debian.org>
 Build-Depends: debhelper (>= 7), help2man
-Standards-Version: 3.8.0
+Standards-Version: 3.8.2
 Homepage: http://www.github.com/gwolf/dh-make-drupal
 Vcs-Svn: git://github.com/gwolf/dh-make-drupal.git
 Vcs-Browser: http://www.github.com/gwolf/dh-make-drupal

@@ -1,11 +1,17 @@
-dh-make-drupal (0.4-1) UNRELEASED; urgency=low
+dh-make-drupal (0.4-1) unstable; urgency=low
 
   * Auto-building manpage (via help2man, added to build-dependencies)
     instead of keeping it in sync by hand
   * Use the DEBEMAIL and DEBFULLNAME variables if they are found (Closes:
     #529310)
+  * Fixed bug which caused packages whose names include underscores to
+    be built as debian-native packages
+  * Properly mangles -dev, -alpha, -beta, -rc version numbers with "~"
+    character (double ~ for -dev) to properly sort them on Debian
+    (Closes: #529317)
+  * Bumped up standards-version to 3.8.2 (no changes needed)
 
- -- Gunnar Wolf <gwolf@debian.org>  Mon, 02 Mar 2009 13:15:24 -0600
+ -- Gunnar Wolf <gwolf@debian.org>  Fri, 26 Jun 2009 13:36:34 -0500
 
 dh-make-drupal (0.3-1) unstable; urgency=low
 
