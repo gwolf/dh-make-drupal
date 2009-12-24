@@ -32,7 +32,7 @@ require 'yaml'
 
 class App < CommandLine::Application
   def initialize
-    version '0.4'
+    version '0.5'
     author 'Gunnar Wolf'
     copyright 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009'
     short_description 'Builds a Debian package for the requested Drupal project'
@@ -790,25 +790,35 @@ module DrupalProject
   # Fetches the list of available versions for a given project, and
   # allows for filtering it to match the user's requested criteria
   class VersionsList < Array
+    class UnknownStatus < Exception;end
     attr_accessor :project
     # Builds the list of available versions for the requested project
     def self.for(proj_name)
       list = VersionsList.new
       list.project = Project.new(proj_name)
       list.project.fetch_data
+      st_map = {'ok' => :recommended, 'warning' => :supported, 
+        'error' => :developer}
 
-      # In the Drupal pages, releases are listed inside <table
-      # class="releases">.
+      # We do web-scraping, although it is quite fragile, because the
+      # RSS feed provided by drupal.org does not show the release's status
+
+      # In the Drupal pages, releases are listed inside <div> elements
+      # indicating (via their CSS classes) the status of the contained
+      # releases, and a table with the details.
       #
       # We will often get more than one element in releases - "official
       # releases" and "development snapshots" are given as two
       # tables. We should look for the highest (i.e. stablest) release
       # we can get.
-      list.project.html.search('table').
-        select {|t| t.attributes['class'] =~ /releases/}.
-        each do |table|
-        (table/'tr').each do |tr|
-          rel = Release.from_tr(tr) or next
+      list.project.html.search('div.download-table').
+        each do |div|
+        div.attributes['class'].split(/\s+/).
+          select {|c| c =~ /download-table-(.+)/}
+        status = st_map[$1]
+
+        div.search('tr').each do |tr|
+          rel = Release.from_tr(tr, status) or next
           rel.project = list.project
           list << rel
         end
@@ -882,23 +892,15 @@ module DrupalProject
     # (yes, heavily dependent on their Web layout). Note that you will
     # still have to explicitly 'give' this Release its project and
     # type once it is created.
-    def self.from_tr(tr)
+    def self.from_tr(tr, status)
       rel = self.new
+      rel.status = Statuses[status]
 
       # We might receive non-interesting (i.e. empty or header)
-      # rows. Check first of all if we have a version string, and
-      # chicken out otherwise.
+      # rows. Check first of all if we have version and link strings,
+      # and chicken out otherwise.
       columns = tr/'td'
-      return nil unless columns[0]
-
-      # We get the status from the tr's class - Not very clean IMHO,
-      # as it is more visual-related, but we do have the necessary
-      # data: It can contain 'ok' (recommended), 'warning' (supported)
-      # or 'error' (developer)
-      rowclass = tr.attributes['class'].split(/\s+/)
-      rel.status = Statuses[:recommended] if rowclass.include? 'ok'
-      rel.status = Statuses[:supported] if rowclass.include? 'warning'
-      rel.status = Statuses[:developer] if rowclass.include? 'error'
+      return nil unless columns[0] and columns[1]
 
       # We split the full version (first column) into Drupal and
       # project versions
@@ -912,13 +914,16 @@ module DrupalProject
       rel.drupal_version = $1
       rel.version = mangle($2)
 
-      # Column 1 has the date this release was uploaded
-      rel.date = Time.parse(columns[1].inner_text)
-      Logger.instance.debug "This release was uploaded on #{rel.date.to_s}"
+      begin
+        rel.date = Time.parse(columns[2].inner_text)
+        Logger.instance.debug "This release was uploaded on #{rel.date.to_s}"
+      rescue => err
+        Logger.instance.warn "Could not parse date «%s» - " +
+          "Registering current date" % columns[2]
+        rel.date = Time.now
+      end
 
-      # Column 3 has two URLs - We care about the first one, which
-      # points to the file download
-      rel.url = (columns[3]/'a')[0].attributes['href']
+      rel.url = (columns[1]/'a')[0].attributes['href']
 
       rel
     end
