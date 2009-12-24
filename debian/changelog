@@ -1,3 +1,9 @@
+dh-make-drupal (0.5-1) unstable; urgency=low
+
+  * New upstream release (Closes: #561946)
+
+ -- Gunnar Wolf <gwolf@debian.org>  Thu, 24 Dec 2009 13:50:05 -0600
+
 dh-make-drupal (0.4-2) unstable; urgency=low
 
   * Had Vcs-Svn field set, it should be Vcs-Git - Fixed.
