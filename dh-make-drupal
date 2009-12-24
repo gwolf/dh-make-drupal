@@ -32,7 +32,7 @@ require 'yaml'
 
 class App < CommandLine::Application
   def initialize
-    version '0.4'
+    version '0.5'
     author 'Gunnar Wolf'
     copyright 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009'
     short_description 'Builds a Debian package for the requested Drupal project'
