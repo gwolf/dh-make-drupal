@@ -91,6 +91,10 @@ DESC
            :opt_description => 'Prepare the debianized directory, but omit ' +
            'the actual package build process. This option is incompatible ' +
            'with either -D and -r.')
+    option(:flag, :names => %w(-R --no-recommends),
+           :opt_description => 'Omits the generation of the Recommends: ' +
+           'line, which is built by scanning of submodule-provided .info ' +
+           'files and may be misleading or introducing too much noise')
     option(:names => %w(--build-switches),
            :opt_found => get_args,
            :opt_not_found => '-us -uc',
@@ -152,6 +156,7 @@ DESC
     o.report_only = opt['-r']
     o.debianize = ! opt['-D']
     o.skip_build = opt['-b']
+    o.skip_recommend = opt['-R']
     o.switches = opt['--build-switches']
     o.tarball = opt['-t']
     o.proj_version = opt['-V']
@@ -465,21 +470,37 @@ module DrupalProject
 
     # Creates the debian/control file
     def setup_control
-      depends = Dependencies.new(@release, @instdir)
-      put_in_file 'control', ['Source: %s' % @pkgname,
-                              'Section: web',
-                              'Priority: extra',
-                              'Maintainer: %s <%s>' % [@maint_name, 
-                                                       @maint_mail],
-                              'Build-Depends: debhelper (>> 5.0.0)',
-                              'Standards-Version: 3.8.4',
-                              'Homepage: %s' % @project.url,
-                              '',
-                              'Package: %s' % @pkgname,
-                              'Architecture: all',
-                              'Depends: %s' % depends.get,
-                              'Description: %s' % short_descr,
-                              long_descr].join("\n")
+      depends = Dependencies.new(@release, @instdir).get
+      # For the recommendations, we remove anything that would be
+      # duplicated from the dependencies
+      recommends = ( Options.skip_recommend ? [] :
+                     ( Recommendations.new(@release, @instdir).get - 
+                       depends ))
+      long = long_descr
+
+      control = ['Source: %s' % @pkgname,
+                 'Section: web',
+                 'Priority: extra',
+                 'Maintainer: %s <%s>' % [@maint_name, @maint_mail],
+                 'Build-Depends: debhelper (>> 5.0.0)',
+                 'Standards-Version: 3.8.4',
+                 'Homepage: %s' % @project.url,
+                 '',
+                 'Package: %s' % @pkgname,
+                 'Architecture: all',
+                 'Depends: %s' % depends.join(', ')]
+      if !recommends.empty?
+        control << 'Recommends: %s' % recommends.join(', ')
+
+        long += ("\n\nThe 'recommended' packages were auto-generated " +
+                 "by dh-make-drupal out of several naïve assumptions " +
+                 "and might not be real packages. ").word_wrap.prefix
+
+      end
+      control << 'Description: %s' % short_descr
+      control << long
+
+      put_in_file 'control', control.join("\n")
     end
 
     # Creates the debian/rules file
@@ -620,7 +641,8 @@ module DrupalProject
 
   # Dependency-related information is (currently?) only expressed in
   # the {module}.info file inside the tarball and can thus only be
-  # gathered once the module is unpacked.
+  # gathered once the module is unpacked. Information in any other
+  # .info file (i.e. for submodules) will be expressed in Recommendations.
   # 
   # All dependencies are expected to be on modules. If this
   # contradicts reality... I'll be glad to change it, I guess :)
@@ -656,9 +678,9 @@ module DrupalProject
     end
 
     # Fetches the list of Debian package dependencies. It is handed
-    # back as a string, ready to put straight in the 'Depends' field.
+    # back as an array.
     def get
-      @depends.join(', ')
+      @depends
     end
 
     private
@@ -687,6 +709,35 @@ module DrupalProject
       rescue Irrelevant
         # Just skip it, it's irrelevant!
       end
+    end
+  end
+
+  # Recommended packages will be handled much as dependencies - For
+  # modules which have several .info files for their submodules, that
+  # information will be reported only as a recommendation.
+  class Recommendations < Dependencies
+    require 'find'
+    def initialize(release, basedir)
+      @d_ver = release.drupal_version
+      @depends = []
+
+      Find.find(basedir) do |filename|
+        next unless filename =~ /\.info$/
+        next if filename =~ /#{release.project.name}\.info/
+        begin
+          File.open(filename).lines.each { |info_fh| parse_depends(info_fh) }
+        rescue Errno::EACCES, Errno::ENOENT
+          Logger.instance.warn(('Expected .info file (%s) not found or not ' +
+                                'readable. Cannot fetch full ' +
+                                'recommendations information.') % filename)
+        end
+      end
+
+      # Remove duplicate dependencies; some submodules will also
+      # depend on the master package, remove that dependency as well
+      @depends = @depends.sort.uniq - [PackageName.for(release.project.name,
+                                                       release.project.p_type,
+                                                       @d_ver) ]
     end
   end
 
