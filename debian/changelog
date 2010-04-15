@@ -1,3 +1,15 @@
+dh-make-drupal (0.6-1) unstable; urgency=low
+
+  * New upstream release
+  * Builds a list of recommended modules/packages out of the submodules'
+    *.info files (Closes: #557116)
+  * Standards-version 3.8.3→3.8.4 (no changes)
+  * Switched to DH7 tiny flavor of debian/rules
+  * Now uses 3.0 (quilt) source format
+  * — This is the "waiting for the DPL decision" release —
+
+ -- Gunnar Wolf <gwolf@debian.org>  Thu, 15 Apr 2010 18:58:31 -0500
+
 dh-make-drupal (0.5-1) unstable; urgency=low
 
   * New upstream release (Closes: #561946)
