@@ -1,4 +1,5 @@
 #!/usr/bin/ruby
+# -*- coding: utf-8 -*-
 
 # dh-make-drupal
 #
@@ -471,7 +472,7 @@ module DrupalProject
                               'Maintainer: %s <%s>' % [@maint_name, 
                                                        @maint_mail],
                               'Build-Depends: debhelper (>> 5.0.0)',
-                              'Standards-Version: 3.8.0',
+                              'Standards-Version: 3.8.4',
                               'Homepage: %s' % @project.url,
                               '',
                               'Package: %s' % @pkgname,

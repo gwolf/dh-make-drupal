@@ -1,3 +1,6 @@
+0.6 - 2010-04-15
+ * Updated generated standards-version to 3.8.4
+
 0.5 - 2009-12-24
  * Drupal.org page layout changed - The present changes made it work
    again :)
