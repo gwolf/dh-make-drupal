@@ -33,7 +33,7 @@ require 'yaml'
 
 class App < CommandLine::Application
   def initialize
-    version '0.5'
+    version '0.6'
     author 'Gunnar Wolf'
     copyright 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009'
     short_description 'Builds a Debian package for the requested Drupal project'
@@ -315,6 +315,7 @@ module DrupalProject
     # structure in it
     def build_structure
       setup_directory
+      setup_source_format
       setup_changelog
       setup_compat
       setup_control
@@ -387,6 +388,12 @@ module DrupalProject
           FileUtils.mv(File.join(move_from,f), @instdir)
         }
       end
+    end
+
+    # Sets up the source format declaration
+    def setup_source_format
+      Dir.mkdir(File.join(@instdir, 'debian/source'))
+      put_in_file 'source/format', '3.0 (quilt)'
     end
 
     # Creates the debian/changelog file
