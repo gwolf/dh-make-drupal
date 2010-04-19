@@ -1,3 +1,10 @@
+dh-make-drupal (0.6-2) unstable; urgency=low
+
+  * Added missing dependencies to build packages (debhelper, build-
+    essential) (Closes: #578290)
+
+ -- Gunnar Wolf <gwolf@debian.org>  Mon, 19 Apr 2010 11:35:50 -0500
+
 dh-make-drupal (0.6-1) unstable; urgency=low
 
   * New upstream release

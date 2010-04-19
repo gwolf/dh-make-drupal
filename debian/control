@@ -10,7 +10,7 @@ Vcs-Browser: http://www.github.com/gwolf/dh-make-drupal
 
 Package: dh-make-drupal
 Architecture: all
-Depends: ${misc:Depends}, ruby, libruby, libcommandline-ruby, libhpricot-ruby
+Depends: ${misc:Depends}, ruby, libruby, libcommandline-ruby, libhpricot-ruby, debhelper (>= 5), build-essential
 Suggests: drupal6 | drupal5
 Description: Create Debian packages from Drupal modules and themes
  The purpose of this program is to generate Debian packages for any Drupal
