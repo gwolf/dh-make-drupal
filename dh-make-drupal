@@ -451,7 +451,7 @@ module DrupalProject
       # canonically it is the GPLv2 - For further joy, it's usually
       # the exact same file! :-)
       if license = File.join(@instdir, find_license[0])
-        data = File.read(license)
+        data = File.read(license) || '' # Avoid an exception if file is missing
         if Digest::MD5.hexdigest(data) == "998ed0c116c0cebfcd9b2107b0d82973"
           res << 'This package is licensed under the GNU General Public ' <<
             'License (GPL) version 2.' << '' <<
@@ -697,7 +697,12 @@ module DrupalProject
       begin
         raise Irrelevant unless line and
           line =~ /dependencies\[.*\]\s*=\s*(.*)\n?/
-        dep = $1
+        # Some modules add what we would regard to as garbage to the
+        # dependencies - Unneeded quoting is the most bothering
+        # example. So, clean up the dependency, leaving only
+        # alphanumeric and hyphens. Oh, and underscores are converted
+        # to hyphens while we are at it.
+        dep = $1.gsub(/[^a-zA-Z0-9_-]/,'').gsub(/_/, '-')
         begin
           if CoreDrupalModules[@d_ver].include?(dep)
             Logger.instance.debug(('Declared dependency %s is part of ' +
