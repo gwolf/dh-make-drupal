@@ -490,7 +490,7 @@ module DrupalProject
                  'Priority: extra',
                  'Maintainer: %s <%s>' % [@maint_name, @maint_mail],
                  'Build-Depends: debhelper (>> 5.0.0)',
-                 'Standards-Version: 3.8.4',
+                 'Standards-Version: 3.9.1.0',
                  'Homepage: %s' % @project.url,
                  '',
                  'Package: %s' % @pkgname,
