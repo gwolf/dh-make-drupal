@@ -1,6 +1,8 @@
 dh-make-drupal (0.7-1) unstable; urgency=low
 
   * New upstream release
+  * Both package's and generated standards-version 3.8.4→3.9.1.0 (no 
+    changes needed) 
   * No longer chokes on needlessly quoted dependencies (Closes: #594337)
 
  -- Gunnar Wolf <gwolf@debian.org>  Wed, 25 Aug 2010 13:37:35 -0500
