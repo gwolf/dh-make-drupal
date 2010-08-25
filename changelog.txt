@@ -1,4 +1,4 @@
-0.7 (unreleased)
+0.7 (2010-08-25)
  * Avoid dying with an exception if LICENSE.txt does not exist (thanks
    to Roel de Cock for the report)
  * No longer chokes on needlesly quoted dependencies
