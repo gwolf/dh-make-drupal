@@ -1,3 +1,10 @@
+dh-make-drupal (0.7-1) unstable; urgency=low
+
+  * New upstream release
+  * No longer chokes on needlessly quoted dependencies (Closes: #594337)
+
+ -- Gunnar Wolf <gwolf@debian.org>  Wed, 25 Aug 2010 13:37:35 -0500
+
 dh-make-drupal (0.6-2) unstable; urgency=low
 
   * Added missing dependencies to build packages (debhelper, build-
