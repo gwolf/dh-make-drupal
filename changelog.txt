@@ -2,6 +2,7 @@
  * Avoid dying with an exception if LICENSE.txt does not exist (thanks
    to Roel de Cock for the report)
  * No longer chokes on needlesly quoted dependencies
+ * Updated generated standards-version to 3.9.1.0
 
 0.6 - 2010-04-15
  * Updated generated standards-version to 3.8.4
