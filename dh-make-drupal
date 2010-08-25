@@ -697,7 +697,12 @@ module DrupalProject
       begin
         raise Irrelevant unless line and
           line =~ /dependencies\[.*\]\s*=\s*(.*)\n?/
-        dep = $1
+        # Some modules add what we would regard to as garbage to the
+        # dependencies - Unneeded quoting is the most bothering
+        # example. So, clean up the dependency, leaving only
+        # alphanumeric and hyphens. Oh, and underscores are converted
+        # to hyphens while we are at it.
+        dep = $1.gsub(/[^a-zA-Z0-9_-]/,'').gsub(/_/, '-')
         begin
           if CoreDrupalModules[@d_ver].include?(dep)
             Logger.instance.debug(('Declared dependency %s is part of ' +
