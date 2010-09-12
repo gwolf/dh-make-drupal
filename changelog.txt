@@ -1,3 +1,7 @@
+0.8 (unreleased)
+ * Include a 'Provides:' line for all included submodules (Debian bug
+   #538710)
+
 0.7 (2010-08-25)
  * Avoid dying with an exception if LICENSE.txt does not exist (thanks
    to Roel de Cock for the report)

@@ -95,6 +95,10 @@ DESC
            :opt_description => 'Omits the generation of the Recommends: ' +
            'line, which is built by scanning of submodule-provided .info ' +
            'files and may be misleading or introducing too much noise')
+    option(:flag, :names => %w(-P --no-provides),
+           :opt_description => 'Omits the generation of the Provides: ' +
+           'line, which is built by scanning of submodule-provided .info ' +
+           'files and may be misleading or introducing too much noise')
     option(:names => %w(--build-switches),
            :opt_found => get_args,
            :opt_not_found => '-us -uc',
@@ -157,6 +161,7 @@ DESC
     o.debianize = ! opt['-D']
     o.skip_build = opt['-b']
     o.skip_recommend = opt['-R']
+    o.skip_provides = opt['-P']
     o.switches = opt['--build-switches']
     o.tarball = opt['-t']
     o.proj_version = opt['-V']
@@ -477,12 +482,16 @@ module DrupalProject
 
     # Creates the debian/control file
     def setup_control
-      depends = Dependencies.new(@release, @instdir).get
-      # For the recommendations, we remove anything that would be
-      # duplicated from the dependencies
+      # In order: First, get what we provide. The dependencies should
+      # be stripped from whatever we provide, as some modules depend
+      # on their own children. Then, recommendations should be
+      # stripped from both dependencies and provides.
+      provides = ( Options.skip_provides ? [] : 
+                   Provides.new(@release, @instdir).packages )
+      depends = Dependencies.new(@release, @instdir).get - provides
       recommends = ( Options.skip_recommend ? [] :
                      ( Recommendations.new(@release, @instdir).get - 
-                       depends ))
+                       (provides + depends) ))
       long = long_descr
 
       control = ['Source: %s' % @pkgname,
@@ -498,12 +507,17 @@ module DrupalProject
                  'Depends: %s' % depends.join(', ')]
       if !recommends.empty?
         control << 'Recommends: %s' % recommends.join(', ')
-
         long += ("\n\nThe 'recommended' packages were auto-generated " +
                  "by dh-make-drupal out of several naïve assumptions " +
                  "and might not be real packages. ").word_wrap.prefix
-
       end
+      if !provides.empty?
+        control << 'Provides: %s' % provides.join(', ')
+        long += ("\n\nThe 'provided' virtual packages were auto-generated " +
+                 "by dh-make-drupal out of several naïve assumptions " +
+                 "and might not be correct. ").word_wrap.prefix
+      end
+
       control << 'Description: %s' % short_descr
       control << long
 
@@ -646,6 +660,48 @@ module DrupalProject
     end
   end
 
+  # Finding the list of *.info files is required at several
+  # places. 
+  module SubmodulesList
+    class NotYetLoaded < Exception;end
+    require 'find'
+
+    def get_submodules(basedir, basepkg)
+      return @submodules if @submodules
+      @submodules = []
+      @basedir = basedir
+      Find.find(basedir) do |path|
+        filename = File.basename(path)
+        next unless filename =~ /\.info$/
+        next if File.basename(filename) == '%s.info' % basepkg
+        @submodules << path
+      end
+      @submodules
+    end
+
+    def submodule_paths
+      @submodules.map { |mod| mod.sub(/^#{@basedir}\//, '') }
+    end
+
+    def submodule_names
+      @submodules.map { |mod| File.basename(mod).sub(/.info$/, '') }
+    end
+  end
+
+  # What submodules does this module provide?
+  class Provides
+    include SubmodulesList
+    def initialize(release, basedir)
+      get_submodules(basedir, release.project.name)
+      @d_ver = release.drupal_version
+    end
+
+    def packages
+      submodule_names.map {|mod| PackageName.for(mod, ProjType.new('Modules'),
+                                                 @d_ver)}
+    end
+  end
+
   # Dependency-related information is (currently?) only expressed in
   # the {module}.info file inside the tarball and can thus only be
   # gathered once the module is unpacked. Information in any other
@@ -728,20 +784,19 @@ module DrupalProject
   # modules which have several .info files for their submodules, that
   # information will be reported only as a recommendation.
   class Recommendations < Dependencies
-    require 'find'
+    include SubmodulesList
     def initialize(release, basedir)
       @d_ver = release.drupal_version
       @depends = []
+      get_submodules(basedir, release.project.name)
 
-      Find.find(basedir) do |filename|
-        next unless filename =~ /\.info$/
-        next if filename =~ /#{release.project.name}\.info/
+      submodule_paths.each do |submod|
         begin
-          File.open(filename).lines.each { |info_fh| parse_depends(info_fh) }
+          File.open(submod).lines.each { |info_fh| parse_depends(info_fh) }
         rescue Errno::EACCES, Errno::ENOENT
           Logger.instance.warn(('Expected .info file (%s) not found or not ' +
                                 'readable. Cannot fetch full ' +
-                                'recommendations information.') % filename)
+                                'recommendations information.') % submod)
         end
       end
 
