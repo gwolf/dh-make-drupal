@@ -1,3 +1,11 @@
+dh-make-drupal (0.8-1) unstable; urgency=low
+
+  * New upstream release
+  * Reworks HTML processing to reflect new upstream site structure
+    (Closes: #600739)
+
+ -- Gunnar Wolf <gwolf@debian.org>  Sat, 23 Oct 2010 22:18:47 -0500
+
 dh-make-drupal (0.7-1) unstable; urgency=low
 
   * New upstream release
