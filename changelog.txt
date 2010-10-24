@@ -1,6 +1,13 @@
-0.8 (unreleased)
+0.8+provides (unreleased)
+ * Candidate branch... Still unsure whether to include feature
  * Include a 'Provides:' line for all included submodules (Debian bug
    #538710)
+
+0.8 (2010-10-23)
+ * Rework HPricot logic to cope with drupal.org's site reorganization
+ * State that translation support is currently less-than-stellar :-(
+   It should be brought back to level once the Debian release is
+   done.
 
 0.7 (2010-08-25)
  * Avoid dying with an exception if LICENSE.txt does not exist (thanks
@@ -20,9 +27,9 @@
 
 0.4 - 2009-06-26
  * Use the Debian email/fullname environment variables if they are
-   found 
+   found
  * Properly mangles -dev, -alpha, -beta, -rc version numbers with "~"
-   character (double ~ for -dev) to properly sort them on Debian 
+   character (double ~ for -dev) to properly sort them on Debian
  * Fixed bug which caused packages whose names include underscores to
    be built as debian-native packages
 
