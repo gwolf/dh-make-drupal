@@ -1,3 +1,8 @@
+0.9 (2012-03-09)
+ * Add the modules list for Drupal7
+ * Updated the packaging style/compat level to debhelper 8, which led
+   to some minor reorganizations
+
 0.8 (2010-10-23)
  * Rework HPricot logic to cope with drupal.org's site reorganization
  * State that translation support is currently less-than-stellar :-(
