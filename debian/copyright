@@ -1,16 +1,11 @@
-Format-Specification: http://wiki.debian.org/Proposals/CopyrightFormat?action=recall&rev=440
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: dh-make-drupal
-Upstream-Maintainer: Gunnar Wolf <gwolf@gwolf.org>
-Upstream-Source: http://www.github.com/gwolf/dh-make-drupal
+Source: http://www.github.com/gwolf/dh-make-drupal
 
 Files: *
-Copyright: Copyright 2009, Gunnar Wolf <gwolf@gwolf.org>
+Copyright: Copyright © 2009-2012, Gunnar Wolf <gwolf@gwolf.org>
 License: GPL-3
- On Debian systems the full text of the GNU General Public License can be 
- found in the `/usr/share/common-licenses/GPL-3' file.
 
-Files: debian/*
-Copyright: Copyright 2009, Gunnar Wolf <gwolf@debian.org>
 License: GPL-3
- On Debian systems the full text of the GNU General Public License can be 
+ On Debian systems the full text of the GNU General Public License can be
  found in the `/usr/share/common-licenses/GPL-3' file.

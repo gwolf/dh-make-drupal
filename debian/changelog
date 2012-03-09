@@ -1,3 +1,12 @@
+dh-make-drupal (0.9-1) unstable; urgency=low
+
+  * New upstream release
+  * Updated generated packaging to current usage
+  * Standards-version 3.9.1→3.9.3 (no changes needed)
+  * Updated Ruby dependencies to their new packaging name
+
+ -- Gunnar Wolf <gwolf@debian.org>  Fri, 09 Mar 2012 13:03:26 -0600
+
 dh-make-drupal (0.8-1) unstable; urgency=low
 
   * New upstream release

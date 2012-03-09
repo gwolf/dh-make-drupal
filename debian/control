@@ -2,20 +2,20 @@ Source: dh-make-drupal
 Section: web
 Priority: extra
 Maintainer: Gunnar Wolf <gwolf@debian.org>
-Build-Depends: debhelper (>= 7.0.50), help2man, ruby, libruby, libcommandline-ruby, libhpricot-ruby
-Standards-Version: 3.9.1.0
+Build-Depends: debhelper (>= 7.0.50), help2man, ruby, libruby, ruby-commandline, ruby-hpricot
+Standards-Version: 3.9.3
 Homepage: http://www.github.com/gwolf/dh-make-drupal
 Vcs-Git: git://github.com/gwolf/dh-make-drupal.git
 Vcs-Browser: http://www.github.com/gwolf/dh-make-drupal
 
 Package: dh-make-drupal
 Architecture: all
-Depends: ${misc:Depends}, ruby, libruby, libcommandline-ruby, libhpricot-ruby, debhelper (>= 5), build-essential
-Suggests: drupal6 | drupal5
+Depends: ${misc:Depends}, ruby, libruby, ruby-commandline, ruby-hpricot, debhelper (>= 5), build-essential
+Suggests: drupal6 | drupal7
 Description: Create Debian packages from Drupal modules and themes
  The purpose of this program is to generate Debian packages for any Drupal
  projects (that is, modules or themes).
- . 
+ .
  Given that Drupal developers publish their work through the main Drupal
  site (http://drupal.org), this program fetches the information for the
  latest available versions (for the right Drupal release, and with the

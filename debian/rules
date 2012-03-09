@@ -8,7 +8,6 @@ BUILDDIR = "$(CURDIR)/debian/$(PACKAGE)"
 
 override_dh_install:
 	dh_install
-	install dh-make-drupal $(BUILDDIR)/usr/bin
 	help2man -s 1 -N ./dh-make-drupal \
 		--name='Builds a Debian package for the requested Drupal project' \
 		> $(BUILDDIR)/usr/share/man/man1/dh-make-drupal.1
