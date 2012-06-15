@@ -4,25 +4,28 @@
 # dh-make-drupal
 #
 # Creates Debian packages from Drupal projects (modules, themes, translations).
-# Copyright (C) 2009-2012 Gunnar Wolf <gwolf@gwolf.org>
-# Instituto de Investigaciones Económicas - UNAM
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 Version = '1.0'
-Copyright = 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009-2012'
-LongDescr = <<DESCR
+Author = 'Gunnar Wolf <gwolf@gwolf.org>'
+Copyright = <<COPYRIGHT
+Copyright © 2009-2012 Gunnar Wolf
+            Instituto de Investigaciones Económicas, UNAM
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at
+your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+COPYRIGHT
+
+Description = <<DESCR
 The purpose of this program is to generate Debian packages for any Drupal
 projects (that is, modules, themes or translations) - Please note note that
 as of October 2010 the infrastructure for publishing translations has
@@ -977,11 +980,12 @@ class Application
     options.mangle_version = true
 
     optparse = OptionParser.new do |opts|
-      opts.banner = LongDescr
+      opts.banner = Description
       opts.version = Version
 
       opts.on('-v', '--version') do
-        puts '%s version %s' % [$0, Version]
+        puts "#{$0} version #{Version}\n\n#{Copyright}\nWritten by #{Author}"
+
         exit 0
       end
 
