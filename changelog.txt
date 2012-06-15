@@ -1,3 +1,8 @@
+1.0 (2012-06-xx)
+ * Use optparse (part of the Ruby standard library) instead of the
+   (orphaned and Ruby 1.9-incompatible) CommandLine::Application
+ * Default to Drupal 7 instead of 6
+
 0.9 (2012-03-09)
  * Add the modules list for Drupal7
  * Updated the packaging style/compat level to debhelper 8, which led

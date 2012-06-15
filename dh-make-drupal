@@ -20,7 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-require 'commandline'
+require 'optparse'
 require 'digest/md5'
 require 'etc'
 require 'fileutils'
@@ -29,169 +29,6 @@ require 'open-uri'
 require 'singleton'
 require 'tmpdir'
 require 'yaml'
-
-
-class App < CommandLine::Application
-  def initialize
-    version '0.9'
-    author 'Gunnar Wolf'
-    copyright 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009-2012'
-    short_description 'Builds a Debian package for the requested Drupal project'
-    long_description <<DESC
-The purpose of this program is to generate Debian packages for any Drupal
-projects (that is, modules, themes or translations) - Please note note that
-as of October 2010 the infrastructure for publishing translations has
-changed, so its current support status through this program is suboptimal
-
-Given that Drupal developers publish their work through the main Drupal
-site (http://drupal.org), this program fetches the information for the
-latest available versions (for the right Drupal release, and with the
-specified stability level), and prepares a Debian package from it.
-
-This Debian package can be locally installed using 'dpkg', or uploaded to your
-Apt repository.
-
-Keep in mind that this package only goes as far as it can, being an automated
-tool. The generated packages will probably require verification/tweaking to
-be of production quality.
-
-This program has been inspired -and named in a similar fashion to- Debian's
-pkg-perl group's dh-make-perl.
-DESC
-    synopsis '[options] project_name'
-    statuses = DrupalProject::Release::statuses
-    projtypes = DrupalProject::ProjType::Known.keys.sort
-
-    option(:names => %w(-d --drupal-version),
-           :opt_found => get_args,
-           :opt_not_found => 6,
-           :opt_description => 'Drupal version',
-           :arg_description => 'version')
-    option(:flag, :names => %w(-r --report-only),
-           :opt_description => "Check only for project availability, " +
-           "don't download or perform any other actions locally. Implies -D.")
-    option(:flag, :names => %w(-f --force),
-           :opt_description  => 'Proceed even if this will overwrite ' +
-           'currently existing files')
-    option(:names => %w(--debug),
-           :opt_found => get_args,
-           :opt_not_found => 1,
-           :opt_description => 'Debug level for generated messages ' +
-           '(0=highest, 5=lowest)',
-           :arg_description => 'level')
-    option(:names => %w(-s --min-status),
-           :opt_found => get_args,
-           :opt_not_found => statuses[0],
-           :opt_description => ('Minimum status to consider for packaging. ' +
-                                'Accepted values: %s. Defaults to %s.' %
-                                [ statuses.map {|s| "'#{s}'"}.join(', '),
-                                  statuses[0]]))
-    option(:flag, :names => %w(-D --dont-debianize),
-           :opt_description => 'Do not attempt to debianize the project, ' +
-           'only download the tarball')
-    option(:flag, :names => %w(-b --no-build),
-           :opt_description => 'Prepare the debianized directory, but omit ' +
-           'the actual package build process. This option is incompatible ' +
-           'with either -D and -r.')
-    option(:flag, :names => %w(-R --no-recommends),
-           :opt_description => 'Omits the generation of the Recommends: ' +
-           'line, which is built by scanning of submodule-provided .info ' +
-           'files and may be misleading or introducing too much noise')
-    option(:names => %w(--build-switches),
-           :opt_found => get_args,
-           :opt_not_found => '-us -uc',
-           :opt_description => 'Switches to pass to dpkg-buildpackage. ' +
-           'Defaults to "-us -uc" (do not sign the generated package). ' +
-           'In order not to give any switches, specify an empty quoted ' +
-           'string (i.e. --build-switches=\'\').')
-    option(:names => %w(-t --tarball),
-           :opt_found => get_args,
-           :opt_description => 'Use the specified tarball as the original ' +
-           'project tar.gz, don\'t look for any other available versions ' +
-           'and don\'t download from the Drupal website. This will require ' +
-           'you also to provide a project version number with -V and the ' +
-           'project type with -T',
-           :arg_description => 'tarball'
-           )
-    option(:names => %w(-T --proj-type),
-           :opt_found => get_args,
-           :opt_description => 'Type of project we are packaging. This ' +
-           'option is only meaningful when working on a local tarball (-t), ' +
-           'and will be ignored otherwise. Accepted values: %s. Defaults ' +
-           'to %s.' % [ projtypes, projtypes[0] ],
-           :opt_not_found => projtypes[0],
-           :arg_description => 'projtype'
-           )
-    option(:names => %w(-V --proj-version),
-           :opt_found => get_args,
-           :opt_description => 'Provide a project version number. This ' +
-           'option is only meaningful when working on a local tarball (-t), ' +
-           'and will be ignored otherwise',
-           :arg_description => 'version'
-           )
-    option(:flag, :names => %w(-m --mangle-version),
-           :opt_description => 'Debian versioning logic includes the «~» ' +
-           'character meaning «anything below» the preceding version ' +
-           'number. This is most useful when dealing with pre-release ' +
-           'qualificators (in order, 1.x-dev, 1.0-alpha1, 1.0-beta, 1.0rc3). '+
-           'dh-make-drupal will try to recognize such patterns and mangle ' +
-           'them so they sort correctly in Debian (and so that when a ' +
-           'stable version is released it appears as higher - For the above ' +
-           'mentioned version numbers, they would result in 1~~dev, ' +
-           '1.0~alpha1, 1.0~beta, 1.0~rc3). You can use this switch to tell ' +
-           'dh-make-drupal to omit this mangling.')
-    option :version, :names => %w(-v --version)
-    option :help, :names => %w(-h --help)
-
-    expected_args :project
-  end
-
-  def main
-    o = DrupalProject::Options
-    log = DrupalProject::Logger.instance
-    log.level = opt['--debug']
-
-    o.d_ver = opt['-d']
-    o.min_status = opt['-s']
-    o.force_overwrite = opt['-f']
-    o.debug = opt['--debug'] 
-    o.report_only = opt['-r']
-    o.debianize = ! opt['-D']
-    o.skip_build = opt['-b']
-    o.skip_recommend = opt['-R']
-    o.switches = opt['--build-switches']
-    o.tarball = opt['-t']
-    o.proj_version = opt['-V']
-    o.proj_type = opt['-T']
-    o.mangle_version = ! opt['-m']
-
-    begin
-      if o.tarball
-        begin
-          down = DrupalProject::Downloader.mock(@project, o.d_ver, 
-                                                o.tarball, o.proj_version)
-        rescue DrupalProject::Downloader::LackingMock
-          log.error 'Missing information: Project name, tarball and project ' +
-            'version are required when working with a local tarball.'
-          exit 1
-        rescue Errno::ENOENT
-          log.error 'Specified tarball (%s) does not exist, cannot continue' %
-            o.tarball
-          exit 1
-        end
-      else
-        down = DrupalProject::Downloader.new(@project, o.d_ver, o.min_status)
-        down.download 
-      end
-
-      deb = DrupalProject::DebianPackager.new(down) 
-      deb.build_structure
-      deb.build_package(o.switches)
-    rescue DrupalProject::SkipRequested
-      # All fine, nothing to see, please move along
-    end
-  end
-end
 
 module DrupalProject
   class SkipRequested < Exception; end
@@ -205,11 +42,14 @@ module DrupalProject
     def self.method_missing(meth,*args)
       attr = meth.to_s
       if attr.gsub! /\=$/,''
-        Logger.instance.debug("Setting configuration key «%s» to «%s»" % 
+        Logger.instance.debug("Setting configuration key «%s» to «%s»" %
                               [attr, args.to_s] )
         @@opts[attr] = args.length<2 ? args[0] : args
       end
       @@opts[attr]
+    end
+    def self.to_h
+      @@opts
     end
   end
 
@@ -226,7 +66,7 @@ module DrupalProject
     # status (as reported by the author) to download - It can be (in
     # decreasing order) :recommended, :supported or :developer,
     # defaulting to :recommended.
-    def initialize(project, d_ver=6, status=:recommended)
+    def initialize(project, d_ver=7, status=:recommended)
       @project = project
       @d_ver = d_ver
       fetch_info(status) unless status == :mock
@@ -1083,3 +923,179 @@ class String
     self.split(/\n/).map {|l| '%s%s' % [with, l.empty? ? '.' : l]}.join("\n")
   end
 end
+class Application
+  Version = '0.9'
+  Author = 'Gunnar Wolf'
+  Copyright = 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009-2012'
+  ShortDescr = 'Builds a Debian package for the requested Drupal project'
+  LongDescr = <<DESCR
+The purpose of this program is to generate Debian packages for any Drupal
+projects (that is, modules, themes or translations) - Please note note that
+as of October 2010 the infrastructure for publishing translations has
+changed, so its current support status through this program is suboptimal
+
+Given that Drupal developers publish their work through the main Drupal
+site (http://drupal.org), this program fetches the information for the
+latest available versions (for the right Drupal release, and with the
+specified stability level), and prepares a Debian package from it.
+
+This Debian package can be locally installed using 'dpkg', or uploaded to your
+Apt repository.
+
+Keep in mind that this package only goes as far as it can, being an automated
+tool. The generated packages will probably require verification/tweaking to
+be of production quality.
+
+This program has been inspired -and named in a similar fashion to- Debian's
+pkg-perl group's dh-make-perl.
+DESCR
+
+  def initialize
+DrupalProject::Logger.instance.level=5
+    statuses = DrupalProject::Release::statuses
+    projtypes = DrupalProject::ProjType::Known.keys.sort
+
+    # Set default options
+    options = DrupalProject::Options
+    options.d_ver = 7
+    options.min_status = statuses[0]
+    options.force_overwrite = false
+    options.debug = 1
+    options.report_only = false
+    options.debianize = true
+    options.skip_build = false
+    options.skip_recommend = false
+    options.switches = '-us -uc'
+    options.tarball = false
+    options.proj_version = nil
+    options.proj_type = projtypes[0]
+    options.mangle_version = true
+
+    optparse = OptionParser.new do |opts|
+      opts.on('-v', '--version') do
+        puts '%s version %s' % [$0, Version]
+        exit 0
+      end
+
+      opts.on( '-h', '--help', 'Display this screen' ) do
+        puts opts
+        exit 0
+      end
+
+      opts.on('-d', '--drupal-version', 'Drupal version'
+              ) { |ver| options.d_ver = ver }
+
+      opts.on('-r', '--report-only',
+              "Check only for project availability, don't download or " +
+              "perform any other actions locally. Implies -D."
+              ) { options.report_only = true }
+
+      opts.on('-f', '--force', 'Proceed even if this will overwrite ' +
+              'currently existing files'
+              ) { options.force_overwrite = true }
+
+      opts.on('--debug LEVEL', 'Debug level for generated messages ' +
+              '(0=highest, 5=lowest)'
+              ) {|level| options.debug = level}
+
+      opts.on('-s', '--min-status', statuses,
+              'Minimum status to consider for packaging. ' +
+              'Accepted values: %s. Defaults to %s.' %
+              [ statuses.map {|s| "'#{s}'"}.join(', '), statuses[0]]
+              ) {|status| options.min_status = status}
+
+      opts.on('-D', '--dont-debianize',
+              'Do not attempt to debianize the project, only download the ' +
+              'tarball'
+              ) { options.debianize = false }
+
+      opts.on('-b', '--no-build', 'Prepare the debianized directory, but ' +
+              'omit the actual package build process. This option is ' +
+              'incompatible with either -D and -r.'
+              ) { options.skip_build = true }
+
+      opts.on('-R', '--no-recommends', 'Omits the generation of the ' +
+              'Recommends: line, which is built by scanning of ' +
+              'submodule-provided .info files and may be misleading or ' +
+              'introducing too much noise'
+              ) { options.skip_recommend = true }
+
+      opts.on('--build-switches', 'Switches to pass to dpkg-buildpackage. ' +
+              'Defaults to "-us -uc" (do not sign the generated package). ' +
+              'In order not to give any switches, specify an empty quoted ' +
+              'string (i.e. --build-switches=\'\').'
+              ) { |switches| options.switches = switches }
+
+      opts.on('-t', '--tarball FILE',
+              'Use the specified tarball as the original ' +
+              'project tar.gz, don\'t look for any other available versions ' +
+              'and don\'t download from the Drupal website. This will ' +
+              'require you also to provide a project version number with -V ' +
+              'and the project type with -T'
+              ) { |tar| options.tarball = tar }
+
+      opts.on('-T', '--proj-type', projtypes,
+              'Type of project we are packaging. This option is ' +
+              'only meaningful when working on a local tarball (-t), and ' +
+              'will be ignored otherwise. Accepted values: %s. Defaults ' +
+              'to %s.' % [ projtypes, projtypes[0] ]
+              ) { |type| options.proj_type = type }
+
+      opts.on('-V', '--proj_version VERSION', 'Provide a project version ' +
+           'number. This option is only meaningful when working on a local ' +
+           'tarball (-t), and will be ignored otherwise'
+              ) { |ver| options.proj_version = ver }
+
+      opts.on('-m', '--mangle-version', 'Debian versioning logic includes ' +
+              'the «~» character meaning «anything below» the preceding ' +
+              'version number. This is most useful when dealing with ' +
+              'pre-release qualificators (in order, 1.x-dev, 1.0-alpha1, '+
+              '1.0-beta, 1.0rc3). dh-make-drupal will try to recognize such ' +
+              'patterns and mangle them so they sort correctly in Debian ' +
+              '(and so that when a stable version is released it appears as ' +
+              'higher - For the above mentioned version numbers, they would ' +
+              'result in 1~~dev, 1.0~alpha1, 1.0~beta, 1.0~rc3). You can use ' +
+              'this switch to tell dh-make-drupal to omit this mangling.'
+              ) { options.mangle_version = false }
+    end
+
+    optparse.parse!
+    options.project = ARGV[0]
+  end
+
+  def run
+    o = DrupalProject::Options
+    log = DrupalProject::Logger.instance
+    log.level = o.debug
+    log.debug "Parsed options:\n#{o.to_h.to_yaml}"
+
+    begin
+      if o.tarball
+        begin
+          down = DrupalProject::Downloader.mock(o.project, o.d_ver, 
+                                                o.tarball, o.proj_version)
+        rescue DrupalProject::Downloader::LackingMock
+          log.error 'Missing information: Project name, tarball and project ' +
+            'version are required when working with a local tarball.'
+          exit 1
+        rescue Errno::ENOENT
+          log.error 'Specified tarball (%s) does not exist, cannot continue' %
+            o.tarball
+          exit 1
+        end
+      else
+        down = DrupalProject::Downloader.new(o.project, o.d_ver, o.min_status)
+        down.download 
+      end
+
+      deb = DrupalProject::DebianPackager.new(down) 
+      deb.build_structure
+      deb.build_package(o.switches)
+    rescue DrupalProject::SkipRequested
+      # All fine, nothing to see, please move along
+    end
+  end
+end
+
+app = Application.new
+app.run
