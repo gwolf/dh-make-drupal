@@ -620,8 +620,11 @@ module DrupalProject
     def self.fetch_from(url)
       auth = self.new
 
-      doc = Hpricot(open(url)) or
+      begin
+        doc = Hpricot(open(url))
+      rescue OpenURI::HTTPError
         raise IOError, "Could not open author information site at #{url}"
+      end
       auth.info_url = url
       auth.name = doc.search('dd.profile-profile_full_name').inner_text
 
@@ -640,8 +643,11 @@ module DrupalProject
       @url = "http://drupal.org/project/#{@name}"
       Logger.instance.debug "Fetching project information from #{@url}"
 
-      @html = Hpricot(open(@url)) or
+      begin
+        @html = Hpricot(open(@url))
+      rescue OpenURI::HTTPError
         raise IOError, "Could not open #{name} project website at #{@url}"
+      end
 
       # Get the project description. Fetch only the first paragraph -
       # This is usually enough for the .deb, and it should be
@@ -923,8 +929,10 @@ class String
     self.split(/\n/).map {|l| '%s%s' % [with, l.empty? ? '.' : l]}.join("\n")
   end
 end
+
+
 class Application
-  Version = '0.9'
+  Version = '1.0'
   Author = 'Gunnar Wolf'
   Copyright = 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009-2012'
   ShortDescr = 'Builds a Debian package for the requested Drupal project'
@@ -951,7 +959,6 @@ pkg-perl group's dh-make-perl.
 DESCR
 
   def initialize
-DrupalProject::Logger.instance.level=5
     statuses = DrupalProject::Release::statuses
     projtypes = DrupalProject::ProjType::Known.keys.sort
 
@@ -1061,6 +1068,13 @@ DrupalProject::Logger.instance.level=5
 
     optparse.parse!
     options.project = ARGV[0]
+
+    if options.project.nil?
+      STDERR.puts "USAGE:"
+      STDERR.puts "  #{$0} [options] project"
+      STDERR.puts "  #{$0} --help for full invocation options"
+      exit 1
+    end
   end
 
   def run
