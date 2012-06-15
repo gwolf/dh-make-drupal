@@ -20,6 +20,30 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+Version = '1.0'
+Copyright = 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009-2012'
+LongDescr = <<DESCR
+The purpose of this program is to generate Debian packages for any Drupal
+projects (that is, modules, themes or translations) - Please note note that
+as of October 2010 the infrastructure for publishing translations has
+changed, so its current support status through this program is suboptimal
+
+Given that Drupal developers publish their work through the main Drupal
+site (http://drupal.org), this program fetches the information for the
+latest available versions (for the right Drupal release, and with the
+specified stability level), and prepares a Debian package from it.
+
+This Debian package can be locally installed using 'dpkg', or uploaded to your
+Apt repository.
+
+Keep in mind that this package only goes as far as it can, being an automated
+tool. The generated packages will probably require verification/tweaking to
+be of production quality.
+
+This program has been inspired -and named in a similar fashion to- Debian's
+pkg-perl group's dh-make-perl.
+DESCR
+
 require 'optparse'
 require 'digest/md5'
 require 'etc'
@@ -932,32 +956,6 @@ end
 
 
 class Application
-  Version = '1.0'
-  Author = 'Gunnar Wolf'
-  Copyright = 'Gunnar Wolf <gwolf@gwolf.org>, IIEc-UNAM 2009-2012'
-  ShortDescr = 'Builds a Debian package for the requested Drupal project'
-  LongDescr = <<DESCR
-The purpose of this program is to generate Debian packages for any Drupal
-projects (that is, modules, themes or translations) - Please note note that
-as of October 2010 the infrastructure for publishing translations has
-changed, so its current support status through this program is suboptimal
-
-Given that Drupal developers publish their work through the main Drupal
-site (http://drupal.org), this program fetches the information for the
-latest available versions (for the right Drupal release, and with the
-specified stability level), and prepares a Debian package from it.
-
-This Debian package can be locally installed using 'dpkg', or uploaded to your
-Apt repository.
-
-Keep in mind that this package only goes as far as it can, being an automated
-tool. The generated packages will probably require verification/tweaking to
-be of production quality.
-
-This program has been inspired -and named in a similar fashion to- Debian's
-pkg-perl group's dh-make-perl.
-DESCR
-
   def initialize
     statuses = DrupalProject::Release::statuses
     projtypes = DrupalProject::ProjType::Known.keys.sort
@@ -979,6 +977,9 @@ DESCR
     options.mangle_version = true
 
     optparse = OptionParser.new do |opts|
+      opts.banner = LongDescr
+      opts.version = Version
+
       opts.on('-v', '--version') do
         puts '%s version %s' % [$0, Version]
         exit 0
