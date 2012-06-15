@@ -1,3 +1,9 @@
+dh-make-drupal (1.0-2) unstable; urgency=low
+
+  * Removed dependency and build-dependency on ruby-commandline
+
+ -- Gunnar Wolf <gwolf@debian.org>  Fri, 15 Jun 2012 17:36:42 -0500
+
 dh-make-drupal (1.0-1) unstable; urgency=low
 
   * Use optparse (part of the Ruby standard library) instead of the
