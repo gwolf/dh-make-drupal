@@ -1,4 +1,9 @@
-1.0 (2012-06-xx)
+1.1 (2012-06-28)
+ * Fix a syntactic detail with optparse: The mandatory arguments for
+   some options were not correctly declared, so the program didn't
+   know what to do with them
+
+1.0 (2012-06-15)
  * Use optparse (part of the Ruby standard library) instead of the
    (orphaned and Ruby 1.9-incompatible) CommandLine::Application
  * Default to Drupal 7 instead of 6
