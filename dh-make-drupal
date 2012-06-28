@@ -1010,7 +1010,7 @@ class Application
               '(0=highest, 5=lowest)'
               ) {|level| options.debug = level}
 
-      opts.on('-s', '--min-status', statuses,
+      opts.on('-s', '--min-status STATUS', statuses,
               'Minimum status to consider for packaging. ' +
               'Accepted values: %s. Defaults to %s.' %
               [ statuses.map {|s| "'#{s}'"}.join(', '), statuses[0]]
@@ -1032,10 +1032,10 @@ class Application
               'introducing too much noise'
               ) { options.skip_recommend = true }
 
-      opts.on('--build-switches', 'Switches to pass to dpkg-buildpackage. ' +
-              'Defaults to "-us -uc" (do not sign the generated package). ' +
-              'In order not to give any switches, specify an empty quoted ' +
-              'string (i.e. --build-switches=\'\').'
+      opts.on('--build-switches SWITCHES', 'Switches to pass to  ' +
+              'dpkg-buildpackage. Defaults to "-us -uc" (do not sign the ' +
+              'generated package). In order not to give any switches, ' +
+              'specify an empty quoted string (i.e. --build-switches=\'\').'
               ) { |switches| options.switches = switches }
 
       opts.on('-t', '--tarball FILE',
@@ -1046,7 +1046,7 @@ class Application
               'and the project type with -T'
               ) { |tar| options.tarball = tar }
 
-      opts.on('-T', '--proj-type', projtypes,
+      opts.on('-T', '--proj-type TYPE', projtypes,
               'Type of project we are packaging. This option is ' +
               'only meaningful when working on a local tarball (-t), and ' +
               'will be ignored otherwise. Accepted values: %s. Defaults ' +
@@ -1058,10 +1058,10 @@ class Application
            'tarball (-t), and will be ignored otherwise'
               ) { |ver| options.proj_version = ver }
 
-      opts.on('-m', '--mangle-version', 'Debian versioning logic includes ' +
-              'the «~» character meaning «anything below» the preceding ' +
-              'version number. This is most useful when dealing with ' +
-              'pre-release qualificators (in order, 1.x-dev, 1.0-alpha1, '+
+      opts.on('-m', '--mangle-version PATTERN', 'Debian versioning logic ' +
+              'includes the «~» character meaning «anything below» the ' +
+              'preceding version number. This is most useful when dealing ' +
+              'with pre-release qualificators (in order, 1.x-dev, 1.0-alpha1, '+
               '1.0-beta, 1.0rc3). dh-make-drupal will try to recognize such ' +
               'patterns and mangle them so they sort correctly in Debian ' +
               '(and so that when a stable version is released it appears as ' +
