@@ -1,3 +1,9 @@
+dh-make-drupal (1.1-1) unstable; urgency=low
+
+  * Mandatory arguments were unhandled - Fixed.
+
+ -- Gunnar Wolf <gwolf@debian.org>  Thu, 28 Jun 2012 17:00:45 -0500
+
 dh-make-drupal (1.0-2) unstable; urgency=low
 
   * Removed dependency and build-dependency on ruby-commandline
