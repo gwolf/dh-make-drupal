@@ -1,3 +1,7 @@
+1.2 (2012-08-13)
+ * "Switch '-d' (Drupal version) was not accepting its needed argument.
+   Fixed, thanks  to Matthew Gabeler-Lee for the report
+
 1.1 (2012-06-28)
  * Fix a syntactic detail with optparse: The mandatory arguments for
    some options were not correctly declared, so the program didn't
