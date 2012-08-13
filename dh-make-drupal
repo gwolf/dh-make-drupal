@@ -994,7 +994,7 @@ class Application
         exit 0
       end
 
-      opts.on('-d', '--drupal-version', 'Drupal version'
+      opts.on('-d VERSION', '--drupal-version', 'Drupal version'
               ) { |ver| options.d_ver = ver }
 
       opts.on('-r', '--report-only',
