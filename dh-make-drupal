@@ -648,7 +648,7 @@ module DrupalProject
       auth = self.new
 
       begin
-        doc = Hpricot(open(url))
+        doc = Hpricot(open(url, 'User-Agent' => "dh-make-drupal %s" % [Version]))
       rescue OpenURI::HTTPError
         raise IOError, "Could not open author information site at #{url}: " + $!
       end
@@ -671,7 +671,7 @@ module DrupalProject
       Logger.instance.debug "Fetching project information from #{@url}"
 
       begin
-        @html = Hpricot(open(@url))
+        @html = Hpricot(open(@url, 'User-Agent' => "dh-make-drupal %s" % [Version]))
       rescue OpenURI::HTTPError
         raise IOError, "Could not open #{name} project website at #{@url}: " + $!
       end
@@ -883,7 +883,8 @@ module DrupalProject
           raise Errno::EEXIST, "Destination filename for source tarball "+
             "(#{dest_file}) already exists. Cannot continue."
         end
-        File.open(dest_file, 'w') {|f| f.write open(url).read}
+        File.open(dest_file, 'w') {|f|
+          f.write open(url, 'User-Agent' => "dh-make-drupal %s" % [Version]).read}
       rescue OpenURI::HTTPError
         Logger.instance.error "Requested URI #{url} could not be retreived: " + $!
       end
