@@ -371,7 +371,7 @@ module DrupalProject
                  'Section: web',
                  'Priority: extra',
                  'Maintainer: %s <%s>' % [@maint_name, @maint_mail],
-                 'Build-Depends: debhelper (>> 8.0.0)',
+                 'Build-Depends: debhelper (>= 8.0.0)',
                  'Standards-Version: 3.9.3',
                  'Homepage: %s' % @project.url,
                  '',
