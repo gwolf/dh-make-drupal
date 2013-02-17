@@ -650,7 +650,7 @@ module DrupalProject
       begin
         doc = Hpricot(open(url))
       rescue OpenURI::HTTPError
-        raise IOError, "Could not open author information site at #{url}"
+        raise IOError, "Could not open author information site at #{url}: " + $!
       end
       auth.info_url = url
       auth.name = doc.search('dd.profile-profile_full_name').inner_text
@@ -673,7 +673,7 @@ module DrupalProject
       begin
         @html = Hpricot(open(@url))
       rescue OpenURI::HTTPError
-        raise IOError, "Could not open #{name} project website at #{@url}"
+        raise IOError, "Could not open #{name} project website at #{@url}: " + $!
       end
 
       # Get the project description. Fetch only the first paragraph -
@@ -885,7 +885,7 @@ module DrupalProject
         end
         File.open(dest_file, 'w') {|f| f.write open(url).read}
       rescue OpenURI::HTTPError
-        Logger.instance.error "Requested URI #{url} could not be retreived"
+        Logger.instance.error "Requested URI #{url} could not be retreived: " + $!
       end
     end
 
