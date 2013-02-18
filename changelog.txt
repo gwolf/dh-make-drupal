@@ -1,3 +1,11 @@
+1.3 (2013-02-18)
+ * Thanks to Stefan Kangas - This release is basically a pull request
+   of his work (https://github.com/gwolf/dh-make-drupal/pull/2)
+ * Provide a User-Agent to keep working despite drupal.org's new
+   restrictions
+ * Show the OpenURI::HTTPError exception reasons
+ * Fix the generated Build-Depends to work correctly on Squeeze
+
 1.2 (2012-08-13)
  * "Switch '-d' (Drupal version) was not accepting its needed argument.
    Fixed, thanks  to Matthew Gabeler-Lee for the report
