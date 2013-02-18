@@ -1,3 +1,13 @@
+dh-make-drupal (1.3-1) unstable; urgency=low
+
+  * Merging Stefan Kangas' pull request - Thanks!
+  * Provide a User-Agent to keep working despite drupal.org's new
+    restrictions
+  * Show the OpenURI::HTTPError exception reasons
+  * Fix the generated Build-Depends to work correctly on Squeeze
+
+ -- Gunnar Wolf <gwolf@debian.org>  Mon, 18 Feb 2013 12:07:02 -0600
+
 dh-make-drupal (1.2-1) unstable; urgency=low
 
   * Switch '-d' (Drupal version) was not accepting its needed argument -
