@@ -287,7 +287,7 @@ module DrupalProject
     # Creates the debian/watch file
     def setup_watch
       res = ['version=3',
-             ( 'http://drupal.org/project/%s .*/%s-%s.x-(\d[\d_.]+)\.tar\.gz' %
+             ( 'https://drupal.org/project/%s .*/%s-%s.x-(\d[\d_.]+)\.tar\.gz' %
                [@project.name, @project.name, @d_ver] ) ].join("\n")
       put_in_file 'watch', res
     end
@@ -667,7 +667,7 @@ module DrupalProject
     end
 
     def fetch_data
-      @url = "http://drupal.org/project/#{@name}"
+      @url = "https://drupal.org/project/#{@name}"
       Logger.instance.debug "Fetching project information from #{@url}"
 
       begin
@@ -689,7 +689,7 @@ module DrupalProject
       # that uploaded the node to Drupal, AFAICT). Still, we do what
       # we can.
       relative_url = @html.search('div.submitted a')[0].get_attribute('href').gsub( /^\//, '')
-      @author = Author.fetch_from('http://drupal.org/%s' % relative_url)
+      @author = Author.fetch_from('https://drupal.org/%s' % relative_url)
 
       # Which kind of project is this? We get the active tab in the
       # 'links' menu.
@@ -704,12 +704,12 @@ module DrupalProject
         @p_type = ProjType.new( @html.search('ul.links li.active')[0].inner_text )
       rescue NoMethodError
         begin
-          trans_url = "http://localize.drupal.org/translate/languages/#{@name}"
+          trans_url = "https://localize.drupal.org/translate/languages/#{@name}"
           if trans = open(trans_url)
             @p_type = ProjType.new('Translations')
             trans_warning = "Translations are probably outdated\n" +
               "Please compare module with #{trans_url} and\n" +
-              "http://localize.drupal.org/translate/downloads"
+              "https://localize.drupal.org/translate/downloads"
             @descr += "\n .\n#{trans_warning}"
             Logger.instance.warn trans_warning
           end
