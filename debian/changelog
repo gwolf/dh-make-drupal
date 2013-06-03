@@ -1,3 +1,10 @@
+dh-make-drupal (1.4-1) unstable; urgency=low
+
+  * Merging yet another Stefan Kangas' pull request - Thanks\!
+  * drupal.org requires now the requests to be made over https
+
+ -- Gunnar Wolf <gwolf@debian.org>  Mon, 03 Jun 2013 18:28:58 -0500
+
 dh-make-drupal (1.3-1) unstable; urgency=low
 
   * Merging Stefan Kangas' pull request - Thanks!
