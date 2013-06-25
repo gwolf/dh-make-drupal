@@ -1,3 +1,12 @@
+dh-make-drupal (1.5-1) unstable; urgency=low
+
+  * New upstream version
+  * Included patch by Pauli allowing user to specify the provided
+    submodules (Closes: #538710)
+  * Standards-version 3.9.3 → 3.9.4 (no changes needed)
+
+ -- Gunnar Wolf <gwolf@debian.org>  Tue, 25 Jun 2013 11:10:01 -0500
+
 dh-make-drupal (1.4-1) unstable; urgency=low
 
   * Merging yet another Stefan Kangas' pull request - Thanks\!
