@@ -5,10 +5,10 @@
 #
 # Creates Debian packages from Drupal projects (modules, themes, translations).
 
-Version = '1.3'
+Version = '1.5'
 Author = 'Gunnar Wolf <gwolf@gwolf.org>'
 Copyright = <<COPYRIGHT
-Copyright © 2009-2012 Gunnar Wolf
+Copyright © 2009-2013 Gunnar Wolf
             Instituto de Investigaciones Económicas, UNAM
 
 This program is free software: you can redistribute it and/or modify
@@ -359,12 +359,12 @@ module DrupalProject
 
     # Creates the debian/control file
     def setup_control
-      depends = Dependencies.new(@release, @instdir).get
+      depends = Dependencies.new(@release, @instdir).get - Options.provides
       # For the recommendations, we remove anything that would be
       # duplicated from the dependencies
       recommends = ( Options.skip_recommend ? [] :
-                     ( Recommendations.new(@release, @instdir).get - 
-                       depends ))
+                     ( Recommendations.new(@release, @instdir).get -
+                       (Options.provides + depends) ))
       long = long_descr
 
       control = ['Source: %s' % @pkgname,
@@ -386,6 +386,13 @@ module DrupalProject
                  "and might not be real packages. ").word_wrap.prefix
 
       end
+
+      if !Options.provides.empty?
+        control << 'Provides: %s' % Options.provides.map {|mod|
+          PackageName.for(mod, ProjType.new('Modules'), @d_ver)
+        }.join(', ')
+      end
+
       control << 'Description: %s' % short_descr
       control << long
 
@@ -979,6 +986,7 @@ class Application
     options.proj_version = nil
     options.proj_type = projtypes[0]
     options.mangle_version = true
+    options.provides = nil
 
     optparse = OptionParser.new do |opts|
       opts.banner = Description
@@ -1070,6 +1078,15 @@ class Application
               'result in 1~~dev, 1.0~alpha1, 1.0~beta, 1.0~rc3). You can use ' +
               'this switch to tell dh-make-drupal to omit this mangling.'
               ) { options.mangle_version = false }
+
+      opts.on('-P', '--provides SUBMODULES', Array, 'generate the Provides: ' +
+              'line, which is built from specified comma-separated ' +
+              'submodules. They will all be converted to what would amount ' +
+              'to their Debian package name -- i.e. "-P foo,bar" becomes ' +
+              '"Provides: drupal7-mod-foo, drupal7-mod-bar" (when building a ' +
+              'Drupal7 module).'
+              ) { |list| options.provides = list }
+
     end
 
     optparse.parse!
