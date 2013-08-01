@@ -1,3 +1,10 @@
+dh-make-drupal (1.6-1) unstable; urgency=low
+
+  * New upstream version
+  * Reliability fixes
+
+ -- Gunnar Wolf <gwolf@debian.org>  Thu, 01 Aug 2013 18:56:02 -0500
+
 dh-make-drupal (1.5-1) unstable; urgency=low
 
   * New upstream version
