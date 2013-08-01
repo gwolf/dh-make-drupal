@@ -5,7 +5,7 @@
 #
 # Creates Debian packages from Drupal projects (modules, themes, translations).
 
-Version = '1.5'
+Version = '1.6'
 Author = 'Gunnar Wolf <gwolf@gwolf.org>'
 Copyright = <<COPYRIGHT
 Copyright © 2009-2013 Gunnar Wolf
@@ -359,6 +359,7 @@ module DrupalProject
 
     # Creates the debian/control file
     def setup_control
+      Options.provides ||= []
       depends = Dependencies.new(@release, @instdir).get - Options.provides
       # For the recommendations, we remove anything that would be
       # duplicated from the dependencies
@@ -452,10 +453,15 @@ module DrupalProject
       files_at_root.select {|f| f =~ /license/i}
     end
 
+    # Returns the install instructions, if one is found
+    def find_install
+      files_at_root.select {|f| f =~ /install/i}
+    end
+
     # Returns the project's documentation files, if found - All the
     # .txt files, excluding changelog and license
     def find_docs
-      files_at_root.select {|f| f =~ /\.txt$/} - find_changelog - find_license
+      files_at_root.select {|f| f =~ /\.txt$/} - find_changelog - find_license - find_install
     end
 
     # The list of files to copy to the debianized package
@@ -554,7 +560,7 @@ module DrupalProject
         # example. So, clean up the dependency, leaving only
         # alphanumeric and hyphens. Oh, and underscores are converted
         # to hyphens while we are at it.
-        dep = $1.gsub(/[^a-zA-Z0-9_-]/,'').gsub(/_/, '-')
+        dep = $1.gsub(/\s.*/,'').gsub(/[^a-zA-Z0-9_-]/,'').gsub(/_/, '-')
         begin
           if CoreDrupalModules[@d_ver].include?(dep)
             Logger.instance.debug(('Declared dependency %s is part of ' +

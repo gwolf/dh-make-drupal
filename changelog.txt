@@ -1,3 +1,8 @@
+1.6 (2013-08-01)
+ * Fixed a problem with the 1.5 patch that errored out on modules not
+   providing submodules
+ * Minor correctness/reliability fixes
+
 1.5 (2013-06-25)
  * Included patch by Pauli allowing user to specify the provided
    submodules
