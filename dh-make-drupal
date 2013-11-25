@@ -692,11 +692,10 @@ module DrupalProject
       # Get the project description. Fetch only the first paragraph -
       # This is usually enough for the .deb, and it should be
       # hand-tuned if needed.
-      @descr = @html.search('div.node-content')[0].search('p')[0].inner_text
+      @descr = @html.search('div.content p')[0].inner_text
 
       # When was the project created?
-      @creation = Time.parse(@html.search('div.submitted').
-                             search('em').inner_text)
+      @creation = Time.parse(@html.search('div.submitted').inner_text)
 
       # Project author: We can only get the "first" author (the one
       # that uploaded the node to Drupal, AFAICT). Still, we do what
@@ -745,8 +744,8 @@ module DrupalProject
       list = VersionsList.new
       list.project = Project.new(proj_name)
       list.project.fetch_data
-      st_map = {'ok' => :recommended, 'warning' => :supported,
-        'error' => :developer}
+      st_map = {'recommended' => :recommended, 'other' => :supported,
+        'development' => :developer}
 
       # We do web-scraping, although it is quite fragile, because the
       # RSS feed provided by drupal.org does not show the release's status
@@ -759,11 +758,15 @@ module DrupalProject
       # releases" and "development snapshots" are given as two
       # tables. We should look for the highest (i.e. stablest) release
       # we can get.
-      list.project.html.search('div.download-table').
+      list.project.html.search('.view-project-release-download-table').
         each do |div|
-        div.attributes['class'].split(/\s+/).
-          select {|c| c =~ /download-table-(.+)/}
-        status = st_map[$1]
+        status=nil
+        div.attributes['class'].split(/\s+/).each do |c|
+          if c =~ /^view-display-id-(#{st_map.keys.join('|')})/
+            status = st_map[$1]
+            break
+          end
+        end
 
         div.search('tr').each do |tr|
           rel = Release.from_tr(tr, status) or next

@@ -1,3 +1,9 @@
+1.7 (2013-11-25)
+ * Drupal.org updated from 6.x to 7.x, screen scraping logic had to
+   be updated
+ * Thanks to Stefan Hornburg and Stefan Kangas for almost
+   simultaneously reporting the issue!
+
 1.6 (2013-08-01)
  * Fixed a problem with the 1.5 patch that errored out on modules not
    providing submodules
