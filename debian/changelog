@@ -1,3 +1,12 @@
+dh-make-drupal (1.7-1) unstable; urgency=low
+
+  * Drupal.org updated from 6.x to 7.x, screen scraping logic had to be
+    updated. (Closes: #730346)
+  * Thanks to Stefan Hornburg and Stefan Kangas for almost
+    simultaneously reporting the issue!
+
+ -- Gunnar Wolf <gwolf@debian.org>  Mon, 25 Nov 2013 14:42:36 -0600
+
 dh-make-drupal (1.6-1) unstable; urgency=low
 
   * New upstream version
