@@ -595,7 +595,7 @@ module DrupalProject
         next unless filename =~ /\.info$/
         next if filename =~ /#{release.project.name}\.info/
         begin
-          File.open(filename).each_lines { |info_fh| parse_depends(info_fh) }
+          File.open(filename).each_line { |info_fh| parse_depends(info_fh) }
         rescue Errno::EACCES, Errno::ENOENT
           Logger.instance.warn(('Expected .info file (%s) not found or not ' +
                                 'readable. Cannot fetch full ' +
