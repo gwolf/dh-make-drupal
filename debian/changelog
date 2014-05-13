@@ -1,6 +1,7 @@
-dh-make-drupal (1.8-1) UNRELEASED; urgency=medium
+dh-make-drupal (1.8-1) unstable; urgency=low
 
   * Updated generated standards-version to 3.9.5
+  * Push this package's standards-version to 3.9.5 (no changes needed)
   * Fix some deprecation warnings due to the update of the Ruby version
   * (Partially) fix the detection of "developer" versions as "recommended"
     ones. (Still breaks where no recommended versions are found) (Closes:
