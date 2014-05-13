@@ -1,3 +1,13 @@
+dh-make-drupal (1.8-1) UNRELEASED; urgency=medium
+
+  * Updated generated standards-version to 3.9.5
+  * Fix some deprecation warnings due to the update of the Ruby version
+  * (Partially) fix the detection of "developer" versions as "recommended"
+    ones. (Still breaks where no recommended versions are found) (Closes:
+    #736325)
+
+ -- Gunnar Wolf <gwolf@debian.org>  Tue, 13 May 2014 13:32:13 -0500
+
 dh-make-drupal (1.7-1) unstable; urgency=low
 
   * Drupal.org updated from 6.x to 7.x, screen scraping logic had to be

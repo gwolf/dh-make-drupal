@@ -373,7 +373,7 @@ module DrupalProject
                  'Priority: extra',
                  'Maintainer: %s <%s>' % [@maint_name, @maint_mail],
                  'Build-Depends: debhelper (>= 8.0.0)',
-                 'Standards-Version: 3.9.3',
+                 'Standards-Version: 3.9.5',
                  'Homepage: %s' % @project.url,
                  '',
                  'Package: %s' % @pkgname,
@@ -534,7 +534,7 @@ module DrupalProject
 
       begin
         filename = File.join(basedir, '%s.info' % release.project.name)
-        File.open(filename).lines.each { |info_fh| parse_depends(info_fh) }
+        File.open(filename).each_line { |info_fh| parse_depends(info_fh) }
       rescue Errno::EACCES, Errno::ENOENT
         Logger.instance.warn(('Expected .info file (%s) not found or not ' +
                               'readable. Cannot fetch dependency ' +
@@ -595,7 +595,7 @@ module DrupalProject
         next unless filename =~ /\.info$/
         next if filename =~ /#{release.project.name}\.info/
         begin
-          File.open(filename).lines.each { |info_fh| parse_depends(info_fh) }
+          File.open(filename).each_lines { |info_fh| parse_depends(info_fh) }
         rescue Errno::EACCES, Errno::ENOENT
           Logger.instance.warn(('Expected .info file (%s) not found or not ' +
                                 'readable. Cannot fetch full ' +
@@ -772,6 +772,20 @@ module DrupalProject
           rel = Release.from_tr(tr, status) or next
           rel.project = list.project
           list << rel
+        end
+      end
+
+      # Remove wrongly detected duplicate versions on different
+      # support levels (leave the lowest one, that's how Drupal's site
+      # is structured. Ugly :-(
+      list.each do |item|
+        list.each do |other|
+          next if item == other
+          next if item.version != other.version
+          if other.status < item.status
+            Logger.instance.debug('Removing duplicate version %s (status %s)' % [item.version, item.status])
+            list.delete(item) if other.status < item.status
+          end
         end
       end
 
