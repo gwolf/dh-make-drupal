@@ -1,3 +1,10 @@
+dh-make-drupal (1.9-1) unstable; urgency=low
+
+  * Fixed bug in the version tables parsing; thanks to Matthew Gabeler-
+    Lee for providing the fix! (Closes: #774193)
+
+ -- Gunnar Wolf <gwolf@debian.org>  Sat, 28 Mar 2015 11:28:48 -0600
+
 dh-make-drupal (1.8-1) unstable; urgency=low
 
   * Updated generated standards-version to 3.9.5
