@@ -778,15 +778,23 @@ module DrupalProject
       # Remove wrongly detected duplicate versions on different
       # support levels (leave the lowest one, that's how Drupal's site
       # is structured. Ugly :-(
+      duplicates = []
       list.each do |item|
+        Logger.instance.debug('Examining item %s:%s status %s' % [item.drupal_version, item.version, item.status])
         list.each do |other|
-          next if item == other
-          next if item.version != other.version
+           Logger.instance.debug('Examining other %s:%s status %s' % [other.drupal_version, other.version, other.status])
+          next if item == other or
+            item.version != other.version or
+            item.drupal_version != other.drupal_version
           if other.status < item.status
-            Logger.instance.debug('Removing duplicate version %s (status %s)' % [item.version, item.status])
-            list.delete(item) if other.status < item.status
+            Logger.instance.debug('Marking duplicate version %s (status %s)' % [item.version, item.status])
+            duplicates << item if other.status < item.status
           end
         end
+      end
+      duplicates.each do |item|
+        Logger.instance.debug('Removing duplicate version %s (status %s)' % [item.version, item.status])
+        list.delete(item)
       end
 
       list
