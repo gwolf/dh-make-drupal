@@ -1,3 +1,11 @@
+dh-make-drupal (2.0-1) UNRELEASED; urgency=medium
+
+  * Fixed bug that caused an ugly error message instead of a proper one
+    when no licensing information is found. Thanks to Adi Kriegisch for
+    the fix! (Closes: #779196)
+
+ -- Gunnar Wolf <gwolf@debian.org>  Thu, 14 May 2015 10:09:58 -0500
+
 dh-make-drupal (1.9-1) unstable; urgency=low
 
   * Fixed bug in the version tables parsing; thanks to Matthew Gabeler-
