@@ -1,2 +1,3 @@
 version=3
-http://githubredir.debian.net/github/gwolf/dh-make-drupal /(\d.*).tar.gz
+opts="filenamemangle=s/(?:.*)?v?(\d[\d\.]*)\.tar\.gz/dh-make-drupal-$1.tar.gz/"
+ https://github.com/gwolf/dh-make-drupal/tags (?:.*/)?v?(\d[\d\.]*).tar.gz
