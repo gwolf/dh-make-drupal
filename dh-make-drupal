@@ -5,10 +5,10 @@
 #
 # Creates Debian packages from Drupal projects (modules, themes, translations).
 
-Version = '1.6'
+Version = '2.0'
 Author = 'Gunnar Wolf <gwolf@gwolf.org>'
 Copyright = <<COPYRIGHT
-Copyright © 2009-2013 Gunnar Wolf
+Copyright © 2009-2015 Gunnar Wolf
             Instituto de Investigaciones Económicas, UNAM
 
 This program is free software: you can redistribute it and/or modify
@@ -327,7 +327,8 @@ module DrupalProject
       # Canonically, Drupal modules include LICENSE.txt. Even more,
       # canonically it is the GPLv2 - For further joy, it's usually
       # one of two exact same files! :-)
-      if license = File.join(@instdir, find_license[0])
+      lic_file = find_license[0]
+      if (! lic_file.nil? and license = File.join(@instdir, lic_file))
         data = File.read(license) || '' # Avoid an exception if file is missing
         if ["998ed0c116c0cebfcd9b2107b0d82973",
             "b234ee4d69f5fce4486a80fdaf4a4263"].include? Digest::MD5.hexdigest(data)
@@ -373,7 +374,7 @@ module DrupalProject
                  'Priority: extra',
                  'Maintainer: %s <%s>' % [@maint_name, @maint_mail],
                  'Build-Depends: debhelper (>= 8.0.0)',
-                 'Standards-Version: 3.9.5',
+                 'Standards-Version: 3.9.6',
                  'Homepage: %s' % @project.url,
                  '',
                  'Package: %s' % @pkgname,

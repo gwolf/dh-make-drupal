@@ -1,3 +1,9 @@
+2.0 (2015-05-14)
+* Fixed bug that caused an ugly error message instead of a proper one
+  when no licensing information is found. Thanks to Adi Kriegisch for
+  the fix!
+* Upgraded generated Debian packages' standards-version to 3.9.6
+
 1.9 (2015-03-28)
 * Fixed bug in the version tables parsing; thanks to Matthew
   Gabeler-Lee for providing the fix!
