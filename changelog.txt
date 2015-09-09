@@ -1,3 +1,8 @@
+2.1 (2015-09-08)
+* Hpricot is considered deprecated, so dh-make-drupal was ported over
+  to Nokogiri. Things seem not to break - But bug reports are
+  expected! :)
+
 2.0 (2015-05-14)
 * Fixed bug that caused an ugly error message instead of a proper one
   when no licensing information is found. Thanks to Adi Kriegisch for

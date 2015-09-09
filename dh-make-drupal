@@ -5,7 +5,7 @@
 #
 # Creates Debian packages from Drupal projects (modules, themes, translations).
 
-Version = '2.0'
+Version = '2.1'
 Author = 'Gunnar Wolf <gwolf@gwolf.org>'
 Copyright = <<COPYRIGHT
 Copyright © 2009-2015 Gunnar Wolf
@@ -51,7 +51,7 @@ require 'optparse'
 require 'digest/md5'
 require 'etc'
 require 'fileutils'
-require 'hpricot'
+require 'nokogiri'
 require 'open-uri'
 require 'singleton'
 require 'tmpdir'
@@ -662,12 +662,12 @@ module DrupalProject
       auth = self.new
 
       begin
-        doc = Hpricot(open(url, 'User-Agent' => "dh-make-drupal %s" % [Version]))
+        doc = Nokogiri::HTML(open(url, 'User-Agent' => "dh-make-drupal %s" % [Version]))
       rescue OpenURI::HTTPError
         raise IOError, "Could not open author information site at #{url}: " + $!
       end
       auth.info_url = url
-      auth.name = doc.search('dd.profile-profile_full_name').inner_text
+      auth.name = doc.search('h1#page-title').inner_text
 
       auth
     end
@@ -685,9 +685,9 @@ module DrupalProject
       Logger.instance.debug "Fetching project information from #{@url}"
 
       begin
-        @html = Hpricot(open(@url, 'User-Agent' => "dh-make-drupal %s" % [Version]))
+        @html = Nokogiri::HTML(open(@url, 'User-Agent' => "dh-make-drupal %s" % [Version]))
       rescue OpenURI::HTTPError
-        raise IOError, "Could not open #{name} project website at #{@url}: " + $!
+        raise IOError, "Could not open #{name} project website at #{@url}: " + $!.to_s
       end
 
       # Get the project description. Fetch only the first paragraph -
@@ -762,7 +762,7 @@ module DrupalProject
       list.project.html.search('.view-project-release-download-table').
         each do |div|
         status=nil
-        div.attributes['class'].split(/\s+/).each do |c|
+        div.get_attribute('class').split(/\s+/).each do |c|
           if c =~ /^view-display-id-(#{st_map.keys.join('|')})/
             status = st_map[$1]
             break
