@@ -1,3 +1,10 @@
+dh-make-drupal (2.1-1) unstable; urgency=medium
+
+  * ruby-hpricot is now obsolete; switched over to ruby-nokogiri
+    (Closes: #796500)
+
+ -- Gunnar Wolf <gwolf@debian.org>  Tue, 08 Sep 2015 19:30:21 -0500
+
 dh-make-drupal (2.0-1) unstable; urgency=medium
 
   * Fixed bug that caused an ugly error message instead of a proper one
