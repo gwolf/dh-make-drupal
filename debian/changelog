@@ -1,3 +1,12 @@
+dh-make-drupal (2.1-2) unstable; urgency=low
+
+  * Dropping obsolete dependency and build-dependency on libruby
+    (Closes: #816417)
+  * Standards-version: 3.9.6→3.9.7 (no changes needed)
+  * Updated/homogenized debhelper dependency to >=9
+
+ -- Gunnar Wolf <gwolf@debian.org>  Tue, 01 Mar 2016 22:40:43 -0600
+
 dh-make-drupal (2.1-1) unstable; urgency=medium
 
   * ruby-hpricot is now obsolete; switched over to ruby-nokogiri
